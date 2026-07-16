@@ -1,0 +1,14 @@
+[Unit]
+Description=field-monitor read-only security audit (user)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=HOME=%h
+ExecStart=%h/.local/bin/field-monitor audit
+StandardOutput=append:%h/.local/share/field-monitor/audit.log
+StandardError=append:%h/.local/share/field-monitor/audit.log
+
+[Install]
+WantedBy=default.target

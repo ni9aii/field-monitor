@@ -1,0 +1,14 @@
+[Unit]
+Description=field-monitor passive reachability probe (user)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=HOME=%h
+ExecStart=%h/.local/bin/field-monitor probe
+StandardOutput=append:%h/.local/share/field-monitor/probe.log
+StandardError=append:%h/.local/share/field-monitor/probe.log
+
+[Install]
+WantedBy=default.target

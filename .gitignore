@@ -1,0 +1,6 @@
+/target
+/config.toml
+/targets.toml
+/.env
+/results
+*.log
