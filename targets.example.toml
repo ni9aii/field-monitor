@@ -1,0 +1,19 @@
+# field-monitor — measurement targets (allowlist) — EXAMPLE.
+# Copy to `targets.toml` (private, git-ignored) and define YOUR targets.
+# The code ships NO hardcoded hosts; see src/model.rs.
+#
+# Each target: name (label) + host (DNS) + url (HTTPS check)
+# OR ip (raw ICMP/TCP, host/url empty). At least one of
+# host/url/ip must be set.
+
+[[targets]]
+name = "example"
+host = "example.com"
+url  = "https://example.com"
+ip   = ""
+
+[[targets]]
+name = "example-api"
+host = "api.example.com"
+url  = "https://api.example.com"
+ip   = ""

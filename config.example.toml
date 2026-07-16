@@ -1,0 +1,29 @@
+# field-monitor — example configuration (servers + rate-limit)
+# Legitimacy: only YOUR OWN infrastructure + passive reachability of
+# public endpoints you are a user of. Copy to `config.toml` and edit.
+#
+# Measurement targets (allowlist) live in a SEPARATE private
+# file `targets.toml` (git-ignored). The code ships NO hardcoded
+# hosts — see src/model.rs (is_safe only sanitizes). Copy
+# `targets.example.toml` to `targets.toml` and define YOUR targets.
+
+# Minimum interval between measurements of one target (seconds) — rate-limit.
+# Prevents turning monitoring into load.
+min_interval_sec = 300
+
+# Servers (only your own). Replace with YOUR hosts/keys/ports.
+# `user` is required. `arch` is "x86_64" (default) or "aarch64" (e.g. an ARM64 SBC).
+# [[servers]]
+# ip   = "YOUR_SERVER_IP"
+# name = "server-1"
+# key  = "/home/YOUR_USER/.ssh/id_your_key"
+# user = "YOUR_USER"
+# port = 22
+#
+# [[servers]]
+# ip   = "YOUR_SERVER_IP_2"
+# name = "arm-node-1"
+# key  = "/home/YOUR_USER/.ssh/id_your_key"
+# user = "YOUR_USER"
+# port = 22
+# arch = "aarch64"

@@ -1,0 +1,20 @@
+# Building field-monitor for servers of different architectures.
+# ARM64 SBC target (Debian bookworm, aarch64). Build host is x86_64.
+#
+# aarch64 is built NATIVELY in the CI container arm64v8/rust:1-bookworm
+# (see .github/workflows/ci.yml, the native-aarch64 job) — same glibc/OS
+# as the target SBC, so the binary is compatible out of the box. Locally
+# you can also cross-compile (gcc-aarch64-linux-gnu), but the container is
+# the primary path.
+
+[target.aarch64-unknown-linux-gnu]
+linker = "aarch64-linux-gnu-gcc"
+# Static linking: the binary is self-contained (no dependency on the target's
+# ld-linux/glibc). Otherwise a cross-built binary links against the
+# interpreter /lib64/..., which is absent on Debian aarch64 (/lib/), and
+# fails with "cannot execute: required file not found".
+rustflags = ["-C", "link-arg=-static"]
+
+# Default local build is x86_64 (this machine).
+[target.x86_64-unknown-linux-gnu]
+linker = "gcc"
