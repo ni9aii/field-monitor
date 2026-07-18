@@ -13,9 +13,9 @@ echo "=== collect ($(date -u +%Y-%m-%dT%H:%M:%SZ)) ==="
   [ -z "$ip" ] && continue
   user="${user:-$USER}"
   echo ">>> $name ($ip)"
-  scp -i "$key" -P "$port" -o StrictHostKeyChecking=accept-new -q \
-    "$user@$ip:~/.local/share/field-monitor/probe.log" "$RESULTS_DIR/$name.log" </dev/null 2>&1 | tail -1 || \
-    echo "    (no log yet)"
+  timeout 10 scp -i "$key" -P "$port" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 -q \
+    "$user@$ip:~/.local/share/field-monitor/probe.log" "$RESULTS_DIR/$name.log" 2>/dev/null || \
+    echo "    (no log / offline)"
 done
 
 echo "=== aggregate ==="
