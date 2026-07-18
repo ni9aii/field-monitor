@@ -21,8 +21,11 @@ echo "=== deploy field-monitor ($(date -u +%Y-%m-%dT%H:%M:%SZ)) ==="
     "$user@$ip" "mkdir -p ~/.local/bin ~/.config/systemd/user ~/.local/share/field-monitor" </dev/null 2>&1 | tail -1 || true
   scp -i "$key" -P "$port" -o StrictHostKeyChecking=accept-new -q \
     "$BIN" "$user@$ip:~/.local/bin/field-monitor" </dev/null 2>&1 | tail -1 || true
+  # Use local config if project config doesn't exist
+  CONFIG_SRC="config.toml"
+  [ ! -f "$CONFIG_SRC" ] && CONFIG_SRC="$HOME/.config/field-monitor.toml"
   scp -i "$key" -P "$port" -o StrictHostKeyChecking=accept-new -q \
-    config.toml "$user@$ip:~/.config/field-monitor.toml" </dev/null 2>&1 | tail -1 || true
+    "$CONFIG_SRC" "$user@$ip:~/.config/field-monitor.toml" </dev/null 2>&1 | tail -1 || true
   for u in systemd/field-monitor-probe.service systemd/field-monitor-probe.timer \
            systemd/field-monitor-audit.service systemd/field-monitor-audit.timer \
            systemd/field-monitor-report.service systemd/field-monitor-report.timer; do
