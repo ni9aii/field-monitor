@@ -55,6 +55,8 @@ FIELD_PROBE_IP=YOUR_SERVER_IP ./target/release/field-monitor probe
 FIELD_PROBE_IP=YOUR_SERVER_IP ./target/release/field-monitor audit
 # 5. Optional: cross-check against a public reference API
 ./target/release/field-monitor corroborate
+# 6. Generate markdown report (latest per target, anomalies only)
+FIELD_MONITOR_MD=/path/to/report.md ./target/release/field-monitor aggregate
 ```
 
 For production deployment (systemd user-units, multi-server orchestration,
