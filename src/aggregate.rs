@@ -129,7 +129,8 @@ pub fn print_summary(s: &Summary) {
     println!("server          label          target       HTTPS  ms     DNSms TCP    ICMP");
     println!("{}", "-".repeat(68));
     // Group rows by server for display
-    let mut server_rows: std::collections::BTreeMap<String, Vec<&ProbeRow>> = std::collections::BTreeMap::new();
+    let mut server_rows: std::collections::BTreeMap<String, Vec<&ProbeRow>> =
+        std::collections::BTreeMap::new();
     for r in &s.rows {
         server_rows.entry(r.server.clone()).or_default().push(r);
     }
@@ -172,7 +173,7 @@ pub fn print_summary(s: &Summary) {
 /// - Anomalies section (if any)
 pub fn generate_markdown_report(s: &Summary, out_path: &Path) -> std::io::Result<()> {
     use std::io::Write;
-    
+
     let timestamp = chrono_like_report(
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -186,30 +187,32 @@ pub fn generate_markdown_report(s: &Summary, out_path: &Path) -> std::io::Result
         let parent = out_path.parent().unwrap_or(Path::new("."));
         out_path = parent.join(format!("{}-{}.md", stem, timestamp));
     }
-    
+
     let mut content = String::new();
     content.push_str("# Field Monitor Report\n\n");
     content.push_str(&format!("**Generated:** {}\n\n", timestamp));
     content.push_str(&format!("**Vantage points:** {}\n\n", s.n_points));
-    
+
     // Group rows by server, take latest per target
     let mut server_rows: BTreeMap<String, Vec<&ProbeRow>> = BTreeMap::new();
     for r in &s.rows {
         server_rows.entry(r.server.clone()).or_default().push(r);
     }
-    
+
     for srv in &s.servers {
         content.push_str(&format!("## {}\n\n", srv.label));
-        
+
         if let Some(rows) = server_rows.get(&srv.ip) {
             // Take latest measurement per target (by DNS ms as proxy for "most recent")
             let mut latest: BTreeMap<&str, &ProbeRow> = BTreeMap::new();
             for r in rows {
                 latest.entry(&r.target).or_insert(r);
             }
-            
-            content.push_str("| Target | DNS IP | HTTPS | Latency (ms) | DNS (ms) | TCP | ICMP |\n");
-            content.push_str("|--------|--------|-------|--------------|----------|-----|------|\n");
+
+            content
+                .push_str("| Target | DNS IP | HTTPS | Latency (ms) | DNS (ms) | TCP | ICMP |\n");
+            content
+                .push_str("|--------|--------|-------|--------------|----------|-----|------|\n");
             for r in latest.values() {
                 let status = if r.https_code == Some(200) && (r.tcp == "open" || r.tcp == "-") {
                     "OK"
@@ -222,11 +225,16 @@ pub fn generate_markdown_report(s: &Summary, out_path: &Path) -> std::io::Result
                 };
                 content.push_str(&format!(
                     "| {} | {} | {} | {} | {} | {} | {} | {}\n",
-                    r.target, r.dns_ip,
+                    r.target,
+                    r.dns_ip,
                     r.https_code.map(|c| c.to_string()).unwrap_or("-".into()),
-                    r.https_ms.map(|m| format!("{} ms", m)).unwrap_or("-".into()),
+                    r.https_ms
+                        .map(|m| format!("{} ms", m))
+                        .unwrap_or("-".into()),
                     r.dns_ms.map(|m| format!("{} ms", m)).unwrap_or("-".into()),
-                    r.tcp, r.icmp, status
+                    r.tcp,
+                    r.icmp,
+                    status
                 ));
             }
             content.push('\n');
@@ -234,7 +242,7 @@ pub fn generate_markdown_report(s: &Summary, out_path: &Path) -> std::io::Result
             content.push_str("(no data)\n\n");
         }
     }
-    
+
     if !s.anomalies.is_empty() {
         content.push_str("## Anomalies\n\n");
         content.push_str("| Server | Label | Target | HTTPS | Latency (ms) | TCP | Status |\n");
@@ -251,9 +259,10 @@ pub fn generate_markdown_report(s: &Summary, out_path: &Path) -> std::io::Result
             ));
         }
     } else {
-        content.push_str("## Anomalies\n\nNone detected (all targets 200/open, latencies normal).\n");
+        content
+            .push_str("## Anomalies\n\nNone detected (all targets 200/open, latencies normal).\n");
     }
-    
+
     let mut file = std::fs::File::create(out_path)?;
     file.write_all(content.as_bytes())
 }
@@ -288,7 +297,10 @@ fn chrono_like_report(secs: u64) -> String {
     let hour = rem / 3600;
     let min = (rem % 3600) / 60;
     let sec = rem % 60;
-    format!("{:02}-{:02}-{:02}T{:02}:{:02}:{:02}Z", year, mon, day, hour, min, sec)
+    format!(
+        "{:02}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+        year, mon, day, hour, min, sec
+    )
 }
 
 #[cfg(test)]
