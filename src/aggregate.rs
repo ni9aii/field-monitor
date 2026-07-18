@@ -173,16 +173,23 @@ pub fn print_summary(s: &Summary) {
 pub fn generate_markdown_report(s: &Summary, out_path: &Path) -> std::io::Result<()> {
     use std::io::Write;
     
-    let now = chrono_like_report(
+    let timestamp = chrono_like_report(
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or(0),
     );
+    let mut out_path = out_path.to_path_buf();
+    // Archive: report-YYYY-MM-DD.md if file already exists
+    if out_path.exists() {
+        let stem = out_path.file_stem().unwrap_or_default().to_string_lossy();
+        let parent = out_path.parent().unwrap_or(Path::new("."));
+        out_path = parent.join(format!("{}-{}.md", stem, timestamp));
+    }
     
     let mut content = String::new();
     content.push_str("# Field Monitor Report\n\n");
-    content.push_str(&format!("**Generated:** {}\n\n", now));
+    content.push_str(&format!("**Generated:** {}\n\n", timestamp));
     content.push_str(&format!("**Vantage points:** {}\n\n", s.n_points));
     
     // Group rows by server, take latest per target
@@ -258,11 +265,23 @@ fn chrono_like_report(secs: u64) -> String {
     let mut d = days;
     let month_days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
     while d >= 365 {
-        let leap = if (year % 4 == 0 && year % 100 != 0) || year % 400 == 0 { 366 } else { 365 };
-        if d >= leap { d -= leap; year += 1; } else { break; }
+        let leap = if (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0) {
+            366
+        } else {
+            365
+        };
+        if d >= leap {
+            d -= leap;
+            year += 1;
+        } else {
+            break;
+        }
     }
     let mut month = 0;
-    while month < 12 && d >= month_days[month] { d -= month_days[month]; month += 1; }
+    while month < 12 && d >= month_days[month] {
+        d -= month_days[month];
+        month += 1;
+    }
     let day = d + 1;
     let mon = month + 1;
     let rem = secs % 86400;
