@@ -4,7 +4,7 @@
 # we pull them into RESULTS_DIR and build the summary.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-export RESULTS_DIR="${RESULTS_DIR:-$HOME/field-monitor-results}"
+export RESULTS_DIR="${RESULTS_DIR:-$HOME/.local/share/field-monitor}"
 mkdir -p "$RESULTS_DIR"
 BIN=target/release/field-monitor
 echo "=== collect ($(date -u +%Y-%m-%dT%H:%M:%SZ)) ==="
