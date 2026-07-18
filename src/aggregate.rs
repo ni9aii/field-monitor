@@ -229,7 +229,7 @@ pub fn generate_markdown_report(s: &Summary, out_path: &Path) -> std::io::Result
                     r.tcp, r.icmp, status
                 ));
             }
-            content.push_str("\n");
+            content.push('\n');
         } else {
             content.push_str("(no data)\n\n");
         }
