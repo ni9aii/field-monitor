@@ -1,0 +1,15 @@
+[Unit]
+Description=field-monitor generate markdown report (user)
+
+[Service]
+Type=oneshot
+Environment=HOME=%h
+Environment=FIELD_MONITOR_CONFIG=%h/.config/field-monitor.toml
+Environment=RESULTS_DIR=%h/.local/share/field-monitor
+Environment=FIELD_MONITOR_MD=%h/.local/share/field-monitor/report.md
+ExecStart=%h/.local/bin/field-monitor aggregate
+StandardOutput=append:%h/.local/share/field-monitor/report.log
+StandardError=append:%h/.local/share/field-monitor/report.log
+
+[Install]
+WantedBy=default.target

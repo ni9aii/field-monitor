@@ -24,7 +24,8 @@ echo "=== deploy field-monitor ($(date -u +%Y-%m-%dT%H:%M:%SZ)) ==="
   scp -i "$key" -P "$port" -o StrictHostKeyChecking=accept-new -q \
     config.toml "$user@$ip:~/.config/field-monitor.toml" </dev/null 2>&1 | tail -1 || true
   for u in systemd/field-monitor-probe.service systemd/field-monitor-probe.timer \
-           systemd/field-monitor-audit.service systemd/field-monitor-audit.timer; do
+           systemd/field-monitor-audit.service systemd/field-monitor-audit.timer \
+           systemd/field-monitor-report.service systemd/field-monitor-report.timer; do
     scp -i "$key" -P "$port" -o StrictHostKeyChecking=accept-new -q \
       "$u" "$user@$ip:~/.config/systemd/user/" </dev/null 2>&1 | tail -1 || true
   done
@@ -32,7 +33,7 @@ echo "=== deploy field-monitor ($(date -u +%Y-%m-%dT%H:%M:%SZ)) ==="
     "$user@$ip" bash -s </dev/null 2>&1 <<EOF | sed 's/^/    /'
 loginctl enable-linger "$(whoami)" 2>/dev/null || true
 systemctl --user daemon-reload
-systemctl --user enable --now field-monitor-probe.timer field-monitor-audit.timer
+systemctl --user enable --now field-monitor-probe.timer field-monitor-audit.timer field-monitor-report.timer
 systemctl --user restart field-monitor-probe.service 2>/dev/null || true
 echo "deployed: probe.timer=$(systemctl --user is-enabled field-monitor-probe.timer 2>/dev/null)"
 EOF
