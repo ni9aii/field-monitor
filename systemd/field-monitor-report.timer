@@ -1,8 +1,8 @@
 [Unit]
-Description=field-monitor generate markdown report daily
+Description=field-monitor generate report hourly
 
 [Timer]
-OnCalendar=daily
+OnCalendar=hourly
 Persistent=true
 
 [Install]
