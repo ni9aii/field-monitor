@@ -2,6 +2,10 @@
 
 [![CI](https://github.com/ni9aii/field-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/ni9aii/field-monitor/actions/workflows/ci.yml)
 
+<p align="center">
+<video src="https://raw.githubusercontent.com/ni9aii/field-monitor/main/logo.mp4" width="600" autoplay muted loop></video>
+</p>
+
 **Passive reachability monitoring of operator-defined public endpoints from
 your own servers, plus a read-only security audit. Written in Rust.**
 
