@@ -164,6 +164,94 @@ pub fn print_summary(s: &Summary) {
     }
 }
 
+/// Generate a markdown report file from the summary.
+///
+/// Output format:
+/// - Header with timestamp and point count
+/// - Per-server sections with tables
+/// - Anomalies section (if any)
+pub fn generate_markdown_report(s: &Summary, out_path: &Path) -> std::io::Result<()> {
+    use std::io::Write;
+    
+    let now = chrono_like_report(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0),
+    );
+    
+    let mut content = String::new();
+    content.push_str(&format!("# Field Monitor Report\n\n"));
+    content.push_str(&format!("**Generated:** {}\n\n", now));
+    content.push_str(&format!("**Vantage points:** {}\n\n", s.n_points));
+    
+    // Group rows by server for the report
+    let mut server_rows: BTreeMap<String, Vec<&ProbeRow>> = BTreeMap::new();
+    for r in &s.rows {
+        server_rows.entry(r.server.clone()).or_default().push(r);
+    }
+    
+    for srv in &s.servers {
+        content.push_str(&format!("## {}\n\n", srv.label));
+        
+        if let Some(rows) = server_rows.get(&srv.ip) {
+            content.push_str("| Target | DNS IP | HTTPS | ms | DNS ms | TCP | ICMP |\n");
+            content.push_str("|--------|--------|-------|-----|--------|-----|------|\n");
+            for r in rows {
+                content.push_str(&format!(
+                    "| {} | {} | {} | {} | {} | {} | {} |\n",
+                    r.target,
+                    r.dns_ip,
+                    r.https_code.map(|c| c.to_string()).unwrap_or("-".into()),
+                    r.https_ms.map(|m| m.to_string()).unwrap_or("-".into()),
+                    r.dns_ms.map(|m| m.to_string()).unwrap_or("-".into()),
+                    r.tcp,
+                    r.icmp
+                ));
+            }
+            content.push_str("\n");
+        } else {
+            content.push_str("(no data)\n\n");
+        }
+    }
+    
+    if !s.anomalies.is_empty() {
+        content.push_str("## Anomalies\n\n");
+        content.push_str("| Server | Label | Target | HTTPS | Latency (ms) | TCP |\n");
+        content.push_str("|--------|-------|--------|-------|-------------|-----|\n");
+        for a in &s.anomalies {
+            content.push_str(&format!(
+                "| {} | {} | {} | {:?} | {:?} | {} |\n",
+                a.ip, a.label, a.target, a.https_code, a.https_ms, a.tcp
+            ));
+        }
+    }
+    
+    let mut file = std::fs::File::create(out_path)?;
+    file.write_all(content.as_bytes())
+}
+
+/// ISO8601-like timestamp for report header.
+fn chrono_like_report(secs: u64) -> String {
+    let days = secs / 86400;
+    let mut year = 1970;
+    let mut d = days;
+    let month_days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    while d >= 365 {
+        let leap = if (year % 4 == 0 && year % 100 != 0) || year % 400 == 0 { 366 } else { 365 };
+        if d >= leap { d -= leap; year += 1; } else { break; }
+    }
+    let mut month = 0;
+    while month < 12 && d >= month_days[month] { d -= month_days[month]; month += 1; }
+    let day = d + 1;
+    let mon = month + 1;
+    let rem = secs % 86400;
+    let hour = rem / 3600;
+    let min = (rem % 3600) / 60;
+    let sec = rem % 60;
+    format!("{:02}-{:02}-{:02}T{:02}:{:02}:{:02}Z", year, mon, day, hour, min, sec)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
