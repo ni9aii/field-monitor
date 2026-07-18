@@ -209,7 +209,7 @@ fn cmd_aggregate() {
     let rows = aggregate::load_probe_logs(&PathBuf::from(&dir));
     let s = aggregate::summarize(rows);
     aggregate::print_summary(&s);
-    
+
     // Generate markdown report if FIELD_MONITOR_MD env is set
     if let Ok(md_path) = std::env::var("FIELD_MONITOR_MD") {
         let out_path = PathBuf::from(&md_path);
@@ -219,7 +219,7 @@ fn cmd_aggregate() {
             eprintln!("Markdown report written to {}", out_path.display());
         }
     }
-    
+
     if std::env::var("FIELD_MONITOR_JSON").is_ok() {
         println!("{}", serde_json::to_string(&s).unwrap_or_default());
     }
