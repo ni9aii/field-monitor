@@ -168,7 +168,7 @@ pub fn print_summary(s: &Summary) {
 ///
 /// Output format:
 /// - Header with timestamp and point count
-/// - Per-server sections with tables
+/// - Per-server sections with tables (latest measurement per target)
 /// - Anomalies section (if any)
 pub fn generate_markdown_report(s: &Summary, out_path: &Path) -> std::io::Result<()> {
     use std::io::Write;
@@ -181,11 +181,11 @@ pub fn generate_markdown_report(s: &Summary, out_path: &Path) -> std::io::Result
     );
     
     let mut content = String::new();
-    content.push_str(&format!("# Field Monitor Report\n\n"));
+    content.push_str("# Field Monitor Report\n\n");
     content.push_str(&format!("**Generated:** {}\n\n", now));
     content.push_str(&format!("**Vantage points:** {}\n\n", s.n_points));
     
-    // Group rows by server for the report
+    // Group rows by server, take latest per target
     let mut server_rows: BTreeMap<String, Vec<&ProbeRow>> = BTreeMap::new();
     for r in &s.rows {
         server_rows.entry(r.server.clone()).or_default().push(r);
@@ -195,18 +195,31 @@ pub fn generate_markdown_report(s: &Summary, out_path: &Path) -> std::io::Result
         content.push_str(&format!("## {}\n\n", srv.label));
         
         if let Some(rows) = server_rows.get(&srv.ip) {
-            content.push_str("| Target | DNS IP | HTTPS | ms | DNS ms | TCP | ICMP |\n");
-            content.push_str("|--------|--------|-------|-----|--------|-----|------|\n");
+            // Take latest measurement per target (by DNS ms as proxy for "most recent")
+            let mut latest: BTreeMap<&str, &ProbeRow> = BTreeMap::new();
             for r in rows {
+                latest.entry(&r.target).or_insert(r);
+            }
+            
+            content.push_str("| Target | DNS IP | HTTPS | Latency (ms) | DNS (ms) | TCP | ICMP |\n");
+            content.push_str("|--------|--------|-------|--------------|----------|-----|------|\n");
+            for r in latest.values() {
+                let status = if r.https_code == Some(200) && (r.tcp == "open" || r.tcp == "-") {
+                    "OK"
+                } else if r.tcp == "closed" {
+                    "BLOCKED"
+                } else if r.https_ms.map(|m| m > 2000).unwrap_or(false) {
+                    "SLOW"
+                } else {
+                    "OK"
+                };
                 content.push_str(&format!(
-                    "| {} | {} | {} | {} | {} | {} | {} |\n",
-                    r.target,
-                    r.dns_ip,
+                    "| {} | {} | {} | {} | {} | {} | {} | {}\n",
+                    r.target, r.dns_ip,
                     r.https_code.map(|c| c.to_string()).unwrap_or("-".into()),
-                    r.https_ms.map(|m| m.to_string()).unwrap_or("-".into()),
-                    r.dns_ms.map(|m| m.to_string()).unwrap_or("-".into()),
-                    r.tcp,
-                    r.icmp
+                    r.https_ms.map(|m| format!("{} ms", m)).unwrap_or("-".into()),
+                    r.dns_ms.map(|m| format!("{} ms", m)).unwrap_or("-".into()),
+                    r.tcp, r.icmp, status
                 ));
             }
             content.push_str("\n");
@@ -217,14 +230,21 @@ pub fn generate_markdown_report(s: &Summary, out_path: &Path) -> std::io::Result
     
     if !s.anomalies.is_empty() {
         content.push_str("## Anomalies\n\n");
-        content.push_str("| Server | Label | Target | HTTPS | Latency (ms) | TCP |\n");
-        content.push_str("|--------|-------|--------|-------|-------------|-----|\n");
+        content.push_str("| Server | Label | Target | HTTPS | Latency (ms) | TCP | Status |\n");
+        content.push_str("|--------|-------|--------|-------|--------------|-----|--------|\n");
         for a in &s.anomalies {
+            let status = if a.https_code.unwrap_or(0) != 200 {
+                "HTTPS_FAIL"
+            } else {
+                "HIGH_LATENCY"
+            };
             content.push_str(&format!(
-                "| {} | {} | {} | {:?} | {:?} | {} |\n",
-                a.ip, a.label, a.target, a.https_code, a.https_ms, a.tcp
+                "| {} | {} | {} | {:?} | {:?} | {} | {} |\n",
+                a.ip, a.label, a.target, a.https_code, a.https_ms, a.tcp, status
             ));
         }
+    } else {
+        content.push_str("## Anomalies\n\nNone detected (all targets 200/open, latencies normal).\n");
     }
     
     let mut file = std::fs::File::create(out_path)?;
