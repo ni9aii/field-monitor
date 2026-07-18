@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # collect.sh — pull monitoring logs from the servers and aggregate locally.
-# Complements deploy.sh: servers write to ~/.local/share/field-monitor/probe.log,
+# Complements deploy.sh: servers write to ~/.local/share/field-monitor/{probe.log,report.md},
 # we pull them into RESULTS_DIR and build the summary.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -19,4 +19,4 @@ echo "=== collect ($(date -u +%Y-%m-%dT%H:%M:%SZ)) ==="
 done
 
 echo "=== aggregate ==="
-"$BIN" aggregate
+FIELD_MONITOR_MD="$RESULTS_DIR/report.md" "$BIN" aggregate
