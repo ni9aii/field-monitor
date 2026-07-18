@@ -180,12 +180,15 @@ pub fn generate_markdown_report(s: &Summary, out_path: &Path) -> std::io::Result
             .map(|d| d.as_secs())
             .unwrap_or(0),
     );
-    let mut out_path = out_path.to_path_buf();
-    // Archive: report-YYYY-MM-DD.md if file already exists
+
+    // Archive existing report if it exists
     if out_path.exists() {
         let stem = out_path.file_stem().unwrap_or_default().to_string_lossy();
         let parent = out_path.parent().unwrap_or(Path::new("."));
-        out_path = parent.join(format!("{}-{}.md", stem, timestamp));
+        let archive_path = parent.join(format!("{}-{}.md", stem, timestamp));
+        if archive_path != out_path {
+            let _ = std::fs::copy(out_path, &archive_path);
+        }
     }
 
     let mut content = String::new();
