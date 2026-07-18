@@ -128,29 +128,25 @@ pub fn print_summary(s: &Summary) {
     println!("\n=== FIELD MONITOR SUMMARY, points: {} ===\n", s.n_points);
     println!("server          label          target       HTTPS  ms     DNSms TCP    ICMP");
     println!("{}", "-".repeat(68));
+    // Group rows by server for display
+    let mut server_rows: std::collections::BTreeMap<String, Vec<&ProbeRow>> = std::collections::BTreeMap::new();
+    for r in &s.rows {
+        server_rows.entry(r.server.clone()).or_default().push(r);
+    }
     for srv in &s.servers {
-        for tg in [
-            "example",
-            "example-api",
-            "service-a",
-            "service-b",
-            "service-c",
-            "resolver",
-        ] {
-            for r in &s.rows {
-                if r.server == srv.ip && r.target == tg {
-                    println!(
-                        "{}  {}  {}  {}  {}  {}  {}  {}",
-                        r.server,
-                        r.label,
-                        r.target,
-                        r.https_code.map(|c| c.to_string()).unwrap_or("-".into()),
-                        r.https_ms.map(|m| m.to_string()).unwrap_or("-".into()),
-                        r.dns_ms.map(|m| m.to_string()).unwrap_or("-".into()),
-                        r.tcp,
-                        r.icmp
-                    );
-                }
+        if let Some(rows) = server_rows.get(&srv.ip) {
+            for r in rows {
+                println!(
+                    "{}  {}  {}  {}  {}  {}  {}  {}",
+                    r.server,
+                    r.label,
+                    r.target,
+                    r.https_code.map(|c| c.to_string()).unwrap_or("-".into()),
+                    r.https_ms.map(|m| m.to_string()).unwrap_or("-".into()),
+                    r.dns_ms.map(|m| m.to_string()).unwrap_or("-".into()),
+                    r.tcp,
+                    r.icmp
+                );
             }
         }
         println!();
