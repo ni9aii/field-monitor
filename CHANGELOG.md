@@ -50,6 +50,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   labelling unmeasured rows `OK`.
 - **Docs:** SETUP documents log rotation (`logrotate`/`journald`) for the
   per-server `probe.log`, which the agent does not rotate itself.
+- **Parsing:** `parse_audit_line` splits into at most 11 fields so a `ports`
+  value containing `|` is no longer silently truncated.
+- **Anomaly detection:** `summarize` now also flags slow DNS resolution
+  (`dns_ms > 2000`) as an anomaly, alongside HTTPS status/latency and TCP.
 
 ## [0.2.0] - 2026-07-19
 

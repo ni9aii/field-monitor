@@ -7,10 +7,12 @@ use crate::model::*;
 
 /// Parse an `AUDIT:`-prefixed line from the audit log.
 /// Returns None if the line lacks 11 pipe-delimited fields.
+/// The final field (`ports`) may itself contain `|`, so we split into at most
+/// 11 fields and let the last one absorb any remainder (no silent truncation).
 #[allow(dead_code)] // public parser API; used in tests and by external consumers
 pub fn parse_audit_line(line: &str) -> Option<AuditRow> {
     let r = line.strip_prefix("AUDIT:")?;
-    let p: Vec<&str> = r.split('|').collect();
+    let p: Vec<&str> = r.splitn(11, '|').collect();
     if p.len() < 11 {
         return None;
     }
@@ -39,6 +41,7 @@ pub fn summarize(rows: Vec<ProbeRow>) -> Summary {
         let bad = r.sane
             && (r.https_code.is_some_and(|c| c != 200)
                 || r.https_ms.is_some_and(|m| m > 2000)
+                || r.dns_ms.is_some_and(|m| m > 2000)
                 || (r.tcp != "open" && r.tcp != "-" && !r.tcp.is_empty()));
         if bad {
             anomalies.push(Anomaly {
@@ -302,6 +305,14 @@ mod tests {
     fn parse_audit_line_too_short_is_none() {
         assert!(parse_audit_line("AUDIT:only|two|fields").is_none());
         assert!(parse_audit_line("not an audit line").is_none());
+    }
+
+    #[test]
+    fn parse_audit_line_ports_field_keeps_pipes() {
+        // The trailing `ports` field can contain `|` — it must not be truncated.
+        let line = "AUDIT:1.2.3.4|s1|no|Ubuntu|22|no|no|active|yes|no|tcp 22|tcp 443|udp 53";
+        let a = parse_audit_line(line).expect("should parse");
+        assert_eq!(a.ports, "tcp 22|tcp 443|udp 53");
     }
 
     #[test]
