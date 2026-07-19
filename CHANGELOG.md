@@ -30,8 +30,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   SSH timeouts (`ConnectTimeout`/`ServerAlive*`) so one unresponsive server
   cannot hang the orchestrator. The uploaded binary is removed from
   `/tmp` after each run.
+- **Scalability:** `run-all` now probes servers in parallel batches of 4
+  (previously fully sequential) and honors `min_interval_sec` as a fleet
+  rate-limit between batches, so a large fleet does not fork-bomb the
+  operator host and one dead server cannot stall the rest.
 - **Robustness:** `audit::listeners()` no longer panics on short `ss` output
   lines (`&parts[0][..3]` → safe slice).
+- **Privacy:** `list-servers` no longer prints the private key path (redacted
+  to `<redacted>`).
+- **Correctness:** `corroborate` now percent-encodes the target URL when
+  querying the reference API (prevents `&`/`#`/`?` from breaking the query),
+  and the no-API fallback reports `ref_anomaly = "False"` (was the
+  non-contractual string `"no-api-url"`).
 
 ## [0.2.0] - 2026-07-19
 
