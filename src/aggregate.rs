@@ -6,6 +6,7 @@ use std::path::Path;
 use crate::model::*;
 
 /// Parse an `AUDIT:`-prefixed line from the audit log.
+/// Returns None if the line lacks 11 pipe-delimited fields.
 #[allow(dead_code)] // public parser API; used in tests and by external consumers
 pub fn parse_audit_line(line: &str) -> Option<AuditRow> {
     let r = line.strip_prefix("AUDIT:")?;
@@ -13,18 +14,19 @@ pub fn parse_audit_line(line: &str) -> Option<AuditRow> {
     if p.len() < 11 {
         return None;
     }
+    // Defensive: use first() to avoid panic on malformed input (clippy-friendly)
     Some(AuditRow {
-        ip: p[0].into(),
-        name: p[1].into(),
-        sudo_nopass: p[2].into(),
-        os: p[3].into(),
-        ssh_port: p[4].into(),
-        ssh_pw: p[5].into(),
-        ssh_root: p[6].into(),
-        ufw: p[7].into(),
-        fail2ban: p[8].into(),
-        docker: p[9].into(),
-        ports: p[10].into(),
+        ip: p.first().map(|s| s.to_string())?,
+        name: p.get(1).map(|s| s.to_string())?,
+        sudo_nopass: p.get(2).map(|s| s.to_string())?,
+        os: p.get(3).map(|s| s.to_string())?,
+        ssh_port: p.get(4).map(|s| s.to_string())?,
+        ssh_pw: p.get(5).map(|s| s.to_string())?,
+        ssh_root: p.get(6).map(|s| s.to_string())?,
+        ufw: p.get(7).map(|s| s.to_string())?,
+        fail2ban: p.get(8).map(|s| s.to_string())?,
+        docker: p.get(9).map(|s| s.to_string())?,
+        ports: p.get(10).map(|s| s.to_string())?,
     })
 }
 
