@@ -11,6 +11,11 @@
 # Prevents turning monitoring into load.
 min_interval_sec = 300
 
+# Max number of servers probed in parallel per batch. 4 is a sane default;
+# raise for large fleets (faster), lower for weak orchestrator hosts (gentler).
+# 0 = unlimited (all servers at once).
+batch_size = 4
+
 # Servers (only your own). Replace with YOUR hosts/keys/ports.
 # `user` is required. `arch` is "x86_64" (default) or "aarch64" (e.g. an ARM64 SBC).
 # [[servers]]

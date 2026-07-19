@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Unit tests for the SSH command-argument escaper (`sh_quote`) and for the
   stricter `Target::is_safe` sanitization (injection chars + IP validation).
+- **Config:** `batch_size` (max servers probed in parallel per batch, default 4;
+  `0` = unlimited). Newest `config.toml` files keep working (serde default).
 
 ### Changed
 
@@ -54,6 +56,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   value containing `|` is no longer silently truncated.
 - **Anomaly detection:** `summarize` now also flags slow DNS resolution
   (`dns_ms > 2000`) as an anomaly, alongside HTTPS status/latency and TCP.
+- **Security (cycle-5 findings):**
+  - `Target::is_safe` now also rejects injection in `name` (`,`/`|`/control
+    chars) — previously `name` bypassed the sanitizer and could corrupt the
+    CSV/AUDIT emit lines.
+  - `generate_markdown_report` refuses to write through a symlink at the report
+    path, and skips archiving a symlinked report (prevents arbitrary-file
+    overwrite / TOCTOU).
+  - `load_probe_logs` skips symlinked `.log` entries (no read-through of a
+    planted link).
+  - `effective_sshd_value` invokes `sudo -n <abs-path>/sshd -T` with an
+    absolute path from a fixed set of trusted locations, removing a
+    PATH-hijack privilege-escalation vector.
+  - `corroborate` now `url_encode`s `CORRO_CC` like the `input` value.
+- **Config:** `batch_size` is now configurable (see Added); the previously
+  hardcoded parallelism of 4 is the default.
 
 ## [0.2.0] - 2026-07-19
 
