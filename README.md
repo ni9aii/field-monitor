@@ -4,8 +4,6 @@
 
 ![field-monitor](https://raw.githubusercontent.com/ni9aii/field-monitor/main/logo.gif)
 
-_Terminal demo of field-monitor measuring public endpoints from multiple vantage points_
-
 **Passive reachability monitoring of operator-defined public endpoints from
 your own servers, plus a read-only security audit. Written in Rust.**
 
