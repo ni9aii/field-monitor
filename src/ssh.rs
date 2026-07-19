@@ -1,6 +1,7 @@
 //! ssh — orchestration: copy the binary to a server and run it remotely.
 //! Legitimate: only our servers, our keys, an explicit target allowlist.
 
+use std::io::ErrorKind;
 use std::process::Command;
 
 use crate::model::*;
@@ -24,11 +25,14 @@ pub fn run_remote(server: &ServerEntry, subcmd: &str, bin_local: &str) -> std::i
         ])
         .output()?;
     if !scp.status.success() {
-        return Err(std::io::Error::other(format!(
-            "scp failed ({}): {}",
-            scp.status,
-            String::from_utf8_lossy(&scp.stderr).trim()
-        )));
+        return Err(std::io::Error::new(
+            ErrorKind::Other,
+            format!(
+                "scp failed ({}): {}",
+                scp.status,
+                String::from_utf8_lossy(&scp.stderr).trim()
+            ),
+        ));
     }
     // 2) ssh run
     let out = Command::new("ssh")
