@@ -8,6 +8,7 @@ use std::process::Command;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::model::*;
+use crate::runner::{CommandRunner, RealRunner};
 
 /// Get timeout from env or default (seconds for most operations).
 fn timeout_env(name: &str, default: &str) -> String {
@@ -81,16 +82,19 @@ fn now_ms() -> u64 {
 }
 
 /// Resolve DNS via `dig` (or `python3` socket as fallback). Returns (ip, ms).
-fn dns_resolve(host: &str) -> Option<(String, u64)> {
+/// Uses a `CommandRunner` so it can be unit-tested with a mock.
+fn dns_resolve(host: &str, runner: &dyn CommandRunner) -> Option<(String, u64)> {
     let t0 = now_ms();
-    let out = Command::new("dig")
-        .args([
-            "+short",
-            &format!("+time={}", dns_timeout()),
-            "+tries=1",
-            host,
-        ])
-        .output()
+    let out = runner
+        .run(
+            "dig",
+            &[
+                "+short",
+                &format!("+time={}", dns_timeout()),
+                "+tries=1",
+                host,
+            ],
+        )
         .ok()?;
     let s = String::from_utf8_lossy(&out.stdout);
     let ip = s
@@ -103,21 +107,24 @@ fn dns_resolve(host: &str) -> Option<(String, u64)> {
     Some((ip.to_string(), t1.saturating_sub(t0)))
 }
 
-/// HTTPS check via `curl`. Returns (code, ms).
-fn https_check(url: &str) -> Option<(u16, u64)> {
+/// HTTPS check via `curl`. Returns (code, ms). Uses a `CommandRunner` so it
+/// can be unit-tested with a mock.
+fn https_check(url: &str, runner: &dyn CommandRunner) -> Option<(u16, u64)> {
     let t0 = now_ms();
-    let out = Command::new("curl")
-        .args([
-            "-s",
-            "-o",
-            "/dev/null",
-            "-w",
-            "%{http_code}",
-            "--max-time",
-            &https_timeout(),
-            url,
-        ])
-        .output()
+    let out = runner
+        .run(
+            "curl",
+            &[
+                "-s",
+                "-o",
+                "/dev/null",
+                "-w",
+                "%{http_code}",
+                "--max-time",
+                &https_timeout(),
+                url,
+            ],
+        )
         .ok()?;
     let t1 = now_ms();
     let code = String::from_utf8_lossy(&out.stdout)
@@ -168,8 +175,14 @@ fn icmp_check(ip: &str) -> (String, Option<u64>) {
     }
 }
 
-/// Run all targets once for a server (name/label/public IP supplied by caller).
-pub fn run(label: &str, public_ip: &str, targets: &[Target]) -> Vec<ProbeRow> {
+/// Run all targets once for a server (name/label/public IP supplied by caller),
+/// executing external probes through `runner` (real commands by default).
+pub fn run_with(
+    label: &str,
+    public_ip: &str,
+    targets: &[Target],
+    runner: &dyn CommandRunner,
+) -> Vec<ProbeRow> {
     let mut rows = Vec::new();
     for t in targets {
         if !t.is_safe() {
@@ -178,7 +191,7 @@ pub fn run(label: &str, public_ip: &str, targets: &[Target]) -> Vec<ProbeRow> {
         }
         // DNS
         let (dns_ip, dns_ms) = if t.ip.is_empty() {
-            match dns_resolve(&t.host) {
+            match dns_resolve(&t.host, runner) {
                 Some((ip, ms)) => (ip, Some(ms)),
                 None => ("-".into(), None),
             }
@@ -189,7 +202,7 @@ pub fn run(label: &str, public_ip: &str, targets: &[Target]) -> Vec<ProbeRow> {
         let (https_code, https_ms) = if t.url.is_empty() {
             (None, None)
         } else {
-            match https_check(&t.url) {
+            match https_check(&t.url, runner) {
                 Some((c, ms)) => (Some(c), Some(ms)),
                 None => (Some(0), None),
             }
@@ -235,6 +248,11 @@ pub fn run(label: &str, public_ip: &str, targets: &[Target]) -> Vec<ProbeRow> {
     rows
 }
 
+/// Run all targets once, using the real system commands.
+pub fn run(label: &str, public_ip: &str, targets: &[Target]) -> Vec<ProbeRow> {
+    run_with(label, public_ip, targets, &RealRunner)
+}
+
 /// Parse curl output to extract HTTP code. Used for testing.
 #[cfg(test)]
 fn parse_curl_code(output: &str) -> u16 {
@@ -268,5 +286,81 @@ mod tests {
         // Remove the env var temporarily to test default
         std::env::remove_var("FM_DNS_TIMEOUT");
         assert_eq!(test_timeout_env(), "3");
+    }
+
+    #[test]
+    fn dns_resolve_parses_mock_output() {
+        use crate::runner::test_runner::MockRunner;
+        let mock = MockRunner::new();
+        // dig +short <host> -> an IP on stdout
+        mock.expect(
+            "dig",
+            &["+short", "+time=3", "+tries=1", "example.com"],
+            "93.184.216.34\n",
+        );
+        let got = dns_resolve("example.com", &mock);
+        // IP is parsed from the mock; ms is elapsed time (don't assert it).
+        assert_eq!(got.map(|(ip, _ms)| ip), Some("93.184.216.34".to_string()));
+    }
+
+    #[test]
+    fn https_check_parses_mock_code() {
+        use crate::runner::test_runner::MockRunner;
+        let mock = MockRunner::new();
+        mock.expect(
+            "curl",
+            &[
+                "-s",
+                "-o",
+                "/dev/null",
+                "-w",
+                "%{http_code}",
+                "--max-time",
+                "8",
+                "https://example.com",
+            ],
+            "200",
+        );
+        let got = https_check("https://example.com", &mock);
+        // code is parsed from the mock; ms is elapsed time (don't assert it).
+        assert_eq!(got.map(|(code, _ms)| code), Some(200));
+    }
+
+    #[test]
+    fn run_with_mock_marks_not_partial_when_measured() {
+        use crate::runner::test_runner::MockRunner;
+        // Both dig and curl return valid data -> row is a real measurement,
+        // not partial.
+        let mock = MockRunner::new();
+        mock.expect(
+            "dig",
+            &["+short", "+time=3", "+tries=1", "example.com"],
+            "93.184.216.34\n",
+        );
+        mock.expect(
+            "curl",
+            &[
+                "-s",
+                "-o",
+                "/dev/null",
+                "-w",
+                "%{http_code}",
+                "--max-time",
+                "8",
+                "https://example.com",
+            ],
+            "200",
+        );
+        let targets = vec![Target {
+            name: "t".into(),
+            host: "example.com".into(),
+            url: "https://example.com".into(),
+            ip: "".into(),
+        }];
+        let rows = run_with("lbl", "203.0.113.5", &targets, &mock);
+        assert_eq!(rows.len(), 1);
+        assert!(!rows[0].partial, "measured row is not partial");
+        assert_eq!(rows[0].dns_ip, "93.184.216.34");
+        assert_eq!(rows[0].https_code, Some(200));
     }
 }
