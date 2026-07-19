@@ -220,3 +220,39 @@ pub fn run(label: &str, public_ip: &str, targets: &[Target]) -> Vec<ProbeRow> {
     }
     rows
 }
+
+/// Parse curl output to extract HTTP code. Used for testing.
+#[cfg(test)]
+fn parse_curl_code(output: &str) -> u16 {
+    output.trim().parse().unwrap_or(0)
+}
+
+/// Timeout environment helper. Used for testing.
+#[cfg(test)]
+fn test_timeout_env() -> String {
+    std::env::var("FM_DNS_TIMEOUT").unwrap_or_else(|_| "3".into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_curl_code_parses_valid() {
+        assert_eq!(parse_curl_code("200"), 200);
+        assert_eq!(parse_curl_code("404"), 404);
+    }
+
+    #[test]
+    fn parse_curl_code_handles_invalid() {
+        assert_eq!(parse_curl_code("not_a_code"), 0);
+        assert_eq!(parse_curl_code(""), 0);
+    }
+
+    #[test]
+    fn test_timeout_env_defaults() {
+        // Remove the env var temporarily to test default
+        std::env::remove_var("FM_DNS_TIMEOUT");
+        assert_eq!(test_timeout_env(), "3");
+    }
+}

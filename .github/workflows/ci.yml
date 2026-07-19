@@ -115,21 +115,22 @@ jobs:
   # aarch64 glibc and is compatible with the SBC out of the box. The x86_64
   # runner runs the arm64 image via QEMU.
   native-aarch64:
-    name: native-build (aarch64 / Debian bookworm)
+    name: native-build+test (aarch64 / Debian bookworm)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
 
       - name: Set up QEMU (arm64 emulation)
         uses: docker/setup-qemu-action@v4
 
-      - name: Build inside aarch64 Debian bookworm container
+      - name: Build + test inside aarch64 Debian bookworm container
         run: |
           docker run --rm --platform linux/arm64 \
             -v "${{ github.workspace }}:/src" -w /src \
             arm64v8/rust:1-bookworm \
-            bash -c "cargo build --release --target aarch64-unknown-linux-gnu"
+            bash -c "cargo build --release --target aarch64-unknown-linux-gnu && \
+                     cargo test --release --target aarch64-unknown-linux-gnu"
 
       - name: Upload aarch64 artifact
         uses: actions/upload-artifact@v7
