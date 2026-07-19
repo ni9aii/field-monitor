@@ -308,4 +308,12 @@ mod tests {
             Path::new("/home/operator/code/field-monitor/target/aarch64-unknown-linux-gnu/release/field-monitor")
         );
     }
+
+    #[test]
+    fn timestamp_iso8601_format() {
+        // Test that timestamp function produces expected format
+        let ts = timestamp_iso8601(1735048000); // 2024-12-25
+        assert!(ts.contains('T'));
+        assert!(ts.ends_with('Z'));
+    }
 }
