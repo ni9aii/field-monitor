@@ -176,14 +176,19 @@ fn cmd_run_all() {
         cfg.servers.len(),
         cfg.min_interval_sec
     );
-    // Limit parallelism to batches of 4 so a fleet of servers does not
-    // fork-bomb the operator host, and so one unresponsive server (now
+    // Limit parallelism to batches of `batch_size` so a fleet of servers does
+    // not fork-bomb the operator host, and so one unresponsive server (now
     // timeout-guarded in ssh.rs) cannot block the rest.
     let min_interval = cfg.min_interval_sec;
     let servers = &cfg.servers;
+    let batch = if cfg.batch_size == 0 {
+        servers.len().max(1)
+    } else {
+        cfg.batch_size
+    };
     let mut start = 0;
     while start < servers.len() {
-        let end = (start + 4).min(servers.len());
+        let end = (start + batch).min(servers.len());
         std::thread::scope(|scope| {
             for (i, srv) in servers.iter().enumerate().skip(start).take(end - start) {
                 let self_bin = self_bin.clone();
