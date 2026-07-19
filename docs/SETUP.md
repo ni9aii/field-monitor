@@ -12,7 +12,8 @@ your servers, and running it as a systemd **user** service (no root needed).
 
 - A non-root user with SSH access (key-based).
 - System tools the agent wraps: `curl`, `dig` (bind-tools / dnsutils),
-  `ping` (iputils-ping), `python3`.
+  `ping` (iputils-ping). (TCP:443 checks use a native Rust socket — `python3`
+  is no longer required.)
 - For the read-only audit: the user must be able to read `/etc/ssh/sshd_config`
   and run `systemctl status` (no sudo required for the audit itself).
 - `loginctl enable-linger <user>` so timers survive without an open session.
