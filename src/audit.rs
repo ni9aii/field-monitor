@@ -112,7 +112,7 @@ fn listeners() -> Vec<String> {
                             .unwrap_or(&"")
                             .parse::<u16>()
                             .ok()
-                            .map(|p| format!("{} {}", &parts[0][..3], p))
+                            .map(|p| format!("{} {}", parts[0].get(..3).unwrap_or(""), p))
                     })
                 })
                 .collect();

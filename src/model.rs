@@ -22,18 +22,51 @@ pub struct Target {
 
 impl Target {
     /// Sanitize a target: reject suspicious patterns (hidden ports, paths to
-    /// third-party admin panels, etc.). The allowlist itself bounds the set,
-    /// but as a safeguard we also do a basic character check.
+    /// third-party admin panels, shell metacharacters, injection attempts).
+    /// The allowlist itself bounds the set, but as a safeguard we also do a
+    /// basic character check so a misconfigured/malicious `targets.toml`
+    /// cannot smuggle an injection through host/url/ip.
     pub fn is_safe(&self) -> bool {
-        // A target is safe if it parsed from config (i.e. explicitly listed by
-        // the operator in the private targets.toml). Extra sanitization: no
-        // unexpected characters in host/url.
-        let host_ok = self.host.is_empty() || !self.host.contains(':') && !self.host.contains('/');
+        let host_ok = self.host.is_empty()
+            || (no_injection_chars(&self.host)
+                && !self.host.contains(':')
+                && !self.host.contains('/'));
         let url_ok = self.url.is_empty()
-            || self.url.starts_with("http://")
-            || self.url.starts_with("https://");
-        host_ok && url_ok
+            || (self.url.starts_with("http://") || self.url.starts_with("https://"))
+                && no_injection_chars(&self.url);
+        let ip_ok = self.ip.is_empty() || valid_ip(&self.ip);
+        host_ok && url_ok && ip_ok
     }
+}
+
+/// Reject shell metacharacters / whitespace / control chars that could be
+/// used to break out of a command or a quoted argument.
+fn no_injection_chars(s: &str) -> bool {
+    !s.contains('\'')
+        && !s.contains('"')
+        && !s.contains('$')
+        && !s.contains(';')
+        && !s.contains('|')
+        && !s.contains('&')
+        && !s.contains('`')
+        && !s.contains('\\')
+        && !s.chars().any(|c| c.is_whitespace() || c.is_control())
+}
+
+/// Validate an IP: empty, IPv4 (4 octets 0-255), or IPv6 (heuristic: contains
+/// ':' and only hex digits / ':' / '.').
+fn valid_ip(s: &str) -> bool {
+    if s.is_empty() {
+        return true;
+    }
+    let octets: Vec<&str> = s.split('.').collect();
+    if octets.len() == 4 && octets.iter().all(|o| o.parse::<u8>().is_ok()) {
+        return true;
+    }
+    // IPv6 heuristic
+    s.contains(':')
+        && s.chars()
+            .all(|c| c.is_ascii_hexdigit() || c == ':' || c == '.')
 }
 
 /// Default targets — EMPTY. The operator MUST define them in the private
@@ -281,13 +314,56 @@ mod tests {
     #[test]
     fn ip_only_target_is_safe() {
         // an IP-only target (no host/url) is a legitimate ICMP target.
+        // Use an RFC5737 TEST-NET-3 address as a placeholder (never a real IP).
         let t = Target {
             name: "dns-resolver".into(),
             host: "".into(),
             url: "".into(),
-            ip: "YOUR_DNS_IP".into(),
+            ip: "203.0.113.5".into(),
         };
         assert!(t.is_safe());
+    }
+
+    #[test]
+    fn is_safe_rejects_injection_in_host() {
+        // A single quote in host must be rejected (would break a quoted arg).
+        let t = Target {
+            name: "evil".into(),
+            host: "example.com'".into(),
+            url: "".into(),
+            ip: "".into(),
+        };
+        assert!(!t.is_safe());
+    }
+
+    #[test]
+    fn is_safe_rejects_bad_ip() {
+        // A non-IP string in the ip field must be rejected.
+        let t = Target {
+            name: "evil".into(),
+            host: "".into(),
+            url: "".into(),
+            ip: "not an ip; rm -rf /".into(),
+        };
+        assert!(!t.is_safe());
+    }
+
+    #[test]
+    fn is_safe_accepts_valid_ipv4_and_ipv6() {
+        assert!(Target {
+            name: "a".into(),
+            host: "".into(),
+            url: "".into(),
+            ip: "192.0.2.10".into()
+        }
+        .is_safe());
+        assert!(Target {
+            name: "a".into(),
+            host: "".into(),
+            url: "".into(),
+            ip: "2001:db8::1".into()
+        }
+        .is_safe());
     }
 
     #[test]

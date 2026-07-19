@@ -9,7 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Unit tests for the SSH command-argument escaper (`sh_quote`) and for the
+  stricter `Target::is_safe` sanitization (injection chars + IP validation).
+
 ### Changed
+
+- **Security:** `probe::tcp_check` now uses a native Rust `TcpStream` instead
+  of a `python3 -c` subprocess — eliminates a command-injection path where a
+  crafted `host` could execute arbitrary Python locally.
+- **Security:** `resolve_public_ip()` no longer calls a hardcoded third-party
+  host (`ifconfig.me`). By default it only reads local interfaces
+  (`hostname -I`); the external lookup is operator-opt-in via
+  `FM_PUBLIC_IP_URL` (unset = no outbound call, preserving the "no hardcoded
+  hosts / no undisclosed outbound" guarantee).
+- **Security:** `Target::is_safe()` now also rejects shell metacharacters
+  (whitespace, `' " $ ; | & \``), validates `ip` as IPv4/IPv6-or-empty, and
+  blocks injection through the `host`/`url`/`ip` fields.
+- **Security:** `ssh::run_remote` escapes `server.name`/`server.ip` when
+  building the remote command (prevents shell injection from config) and adds
+  SSH timeouts (`ConnectTimeout`/`ServerAlive*`) so one unresponsive server
+  cannot hang the orchestrator. The uploaded binary is removed from
+  `/tmp` after each run.
+- **Robustness:** `audit::listeners()` no longer panics on short `ss` output
+  lines (`&parts[0][..3]` → safe slice).
 
 ## [0.2.0] - 2026-07-19
 

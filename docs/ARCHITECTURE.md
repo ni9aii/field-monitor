@@ -62,10 +62,26 @@ a probe attacker.
 
 1. **Privacy** — the set of measured endpoints is operator-specific and
    never published.
-2. **Safety** — `Target::is_safe()` only sanitizes (rejects injection-like
-   `host:port` / `host/path`); the allowlist itself is the hard boundary.
+2. **Safety** — `Target::is_safe()` rejects injection-like and malformed
+   input: no `host:port` / `host/path`, no shell metacharacters (`' " $ ; | &` \``
+   or whitespace/control chars) in `host`/`url`, and `ip` must be a valid
+   IPv4/IPv6 or empty. The allowlist itself is the hard boundary.
    `default_targets()` returns an empty list — the operator MUST define
    targets, the code provides none.
+
+### Public IP discovery (no hardcoded outbound)
+
+`resolve_public_ip()` no longer calls a fixed third-party host. By default it
+only reads local interfaces (`hostname -I`). The external lookup is
+operator-opt-in via `FM_PUBLIC_IP_URL` (unset = no outbound call, so no third
+party learns the vantage point's IP). This keeps the "no hardcoded hosts / no
+undisclosed outbound" guarantee.
+
+### TCP:443 check is native Rust
+
+`probe::tcp_check` opens a `std::net::TcpStream` directly — no `python3`
+subprocess, so a crafted `host` value cannot inject into a `python3 -c`
+string.
 
 This means the repository is a generic monitoring framework; what it watches
 is entirely your configuration.
