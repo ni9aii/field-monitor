@@ -206,6 +206,9 @@ pub struct ProbeRow {
     pub icmp_ms: Option<u64>,
     /// false = broken metric (timer overflow, etc.), excluded from statistics.
     pub sane: bool,
+    /// true = at least one sub-check (DNS/HTTPS/TCP/ICMP) failed to run, so the
+    /// row is a partial result, not a definitive "target is dead" verdict.
+    pub partial: bool,
 }
 
 /// A security-audit row.

@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use crate::logfmt;
 use crate::model::*;
 
 /// Parse an `AUDIT:`-prefixed line from the audit log.
@@ -99,34 +100,10 @@ pub fn load_probe_logs(dir: &Path) -> Vec<ProbeRow> {
                     continue; // audit lines are not aggregated into the probe summary
                 }
                 // Probe lines may be prefixed with "[N] IP ->" from run-all.
-                let csv = match line.find("target,") {
-                    Some(idx) => &line[idx..],
-                    None => continue,
-                };
-                let f: Vec<&str> = csv.split(',').collect();
-                // Line format: target,<name>,<dns_ip>,<dns_ms>,<https>,<https_ms>,<tcp>,<tcp_ms>,<icmp>,<icmp_ms> (10 fields).
-                // f[0] == "target" (literal label); real data is shifted by +1.
-                if f.len() != 10 || !f[1].chars().next().is_some_and(|c| c.is_alphabetic()) {
-                    continue;
+                // Parse via the shared formatter (single source of truth).
+                if let Some(row) = logfmt::parse_probe_line(line, &cur_ip, &cur_label) {
+                    rows.push(row);
                 }
-                let parse_u = |s: &str| s.parse::<u64>().ok();
-                rows.push(ProbeRow {
-                    server: cur_ip.clone(),
-                    label: cur_label.clone(),
-                    target: f[1].into(),
-                    dns_ip: f[2].into(),
-                    dns_ms: parse_u(f[3]),
-                    https_code: f[4].parse::<u16>().ok(),
-                    https_ms: parse_u(f[5]),
-                    tcp: f[6].into(),
-                    tcp_ms: parse_u(f[7]),
-                    icmp: f[8].into(),
-                    icmp_ms: parse_u(f[9]),
-                    sane: f.iter().all(|v| {
-                        let n = v.parse::<u64>().ok();
-                        n.is_none() || n.unwrap() < 60_000
-                    }),
-                });
             }
         }
     }
@@ -353,6 +330,7 @@ mod tests {
             icmp: "ok".into(),
             icmp_ms: Some(5),
             sane: true,
+            partial: false,
         }];
         let s = summarize(rows);
         assert_eq!(s.anomalies.len(), 1);
@@ -374,6 +352,7 @@ mod tests {
             icmp: "ok".into(),
             icmp_ms: Some(5),
             sane: true,
+            partial: false,
         }];
         let s = summarize(rows);
         assert_eq!(s.anomalies.len(), 1);
@@ -394,6 +373,7 @@ mod tests {
             icmp: "ok".into(),
             icmp_ms: Some(5),
             sane: true,
+            partial: false,
         }];
         let s = summarize(rows);
         assert!(s.anomalies.is_empty());
@@ -407,7 +387,7 @@ mod tests {
         let p = dir.join("server-1.log");
         std::fs::write(
             &p,
-            "[1] YOUR_SERVER_IP -> PROBE_IP=YOUR_SERVER_IP NAME=server-1\n[1] YOUR_SERVER_IP -> target,example,YOUR_DNS_IP,32,200,391,open,77,-,-\n[1] YOUR_SERVER_IP -> target,resolver,YOUR_RESOLVER_IP,0,-,-,-,-,ok,4\n",
+            "[1] YOUR_SERVER_IP -> PROBE_IP=YOUR_SERVER_IP NAME=server-1\n[1] YOUR_SERVER_IP -> target,example,YOUR_DNS_IP,32,200,391,open,77,-,-,0\n[1] YOUR_SERVER_IP -> target,resolver,YOUR_RESOLVER_IP,0,-,-,-,-,ok,4,0\n",
         )
         .unwrap();
         let rows = load_probe_logs(Path::new(&dir));
