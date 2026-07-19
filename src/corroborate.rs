@@ -52,7 +52,7 @@ fn fetch_reference(input: &str) -> Option<(bool, String, String, usize)> {
         .map(|d| d.as_secs())
         .unwrap_or(0)
         .saturating_sub(30 * 24 * 3600);
-    let since = chrono_like(secs);
+    let since = timestamp_iso8601(secs);
     let cc = probe_cc();
     let url = match api_url() {
         Ok(u) => format!(
@@ -85,42 +85,6 @@ fn fetch_reference(input: &str) -> Option<(bool, String, String, usize)> {
         .unwrap_or("")
         .to_string();
     Some((anomaly, bt, mt, results.len()))
-}
-
-/// Rough ISO8601 without external crates (YYYY-MM-DDTHH:MM:SS).
-fn chrono_like(secs: u64) -> String {
-    let days = secs / 86400;
-    let mut y = 1970;
-    let mut d = days as i64;
-    let month_days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    while d >= 365 {
-        let leap = if (y % 4 == 0 && y % 100 != 0) || y % 400 == 0 {
-            366
-        } else {
-            365
-        };
-        if d >= leap {
-            d -= leap;
-            y += 1;
-        } else {
-            break;
-        }
-    }
-    let mut m = 0;
-    while m < 12 && d >= month_days[m] {
-        d -= month_days[m];
-        m += 1;
-    }
-    let day = d + 1;
-    let mon = m + 1;
-    let rem = secs % 86400;
-    let hh = rem / 3600;
-    let mm = (rem % 3600) / 60;
-    let ss = rem % 60;
-    format!(
-        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}",
-        y, mon, day, hh, mm, ss
-    )
 }
 
 /// Run corroboration over allowlist targets (only those with a url).
