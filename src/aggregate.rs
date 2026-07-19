@@ -79,9 +79,9 @@ pub fn load_probe_logs(dir: &Path) -> Vec<ProbeRow> {
                 // PROBE_IP may be prefixed with "[N] IP ->" from run-all.
                 if let Some(rest) = line.split("PROBE_IP=").nth(1) {
                     let mut it = rest.split_whitespace();
-                    cur_ip = it.next().unwrap_or("?").trim_matches('\'').to_string();
+                    cur_ip = it.next().unwrap_or("?").trim().to_string();
                     if let Some(n) = it.next() {
-                        cur_label = n.trim_start_matches("NAME=").trim_matches('\'').to_string();
+                        cur_label = n.trim_start_matches("NAME=").trim().to_string();
                     }
                     continue;
                 }
@@ -279,8 +279,6 @@ pub fn generate_markdown_report(s: &Summary, out_path: &Path) -> std::io::Result
     let mut file = std::fs::File::create(out_path)?;
     file.write_all(content.as_bytes())
 }
-
-
 
 #[cfg(test)]
 mod tests {
