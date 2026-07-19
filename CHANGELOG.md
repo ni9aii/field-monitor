@@ -13,7 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stricter `Target::is_safe` sanitization (injection chars + IP validation).
 - **Config:** `batch_size` (max servers probed in parallel per batch, default 4;
   `0` = unlimited). Newest `config.toml` files keep working (serde default).
-
+- **Log format (cycle-6):** new `src/logfmt.rs` is the single source of truth
+  for probe-line emit/parse (`emit_probe_row` / `parse_probe_line`) with a
+  round-trip unit test, so writer and reader can no longer silently drift.
+  Probe lines now carry an 11th `partial` field (1 = at least one sub-check
+  failed, so the row is a partial result, not a definitive outage).
 ### Changed
 
 - **Security:** `probe::tcp_check` now uses a native Rust `TcpStream` instead
@@ -71,6 +75,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `corroborate` now `url_encode`s `CORRO_CC` like the `input` value.
 - **Config:** `batch_size` is now configurable (see Added); the previously
   hardcoded parallelism of 4 is the default.
+- **Orchestrator (cycle-6):** `run_remote` now uploads the binary once per
+  server (for the `probe` subcommand) and reuses it for `audit`, instead of
+  scp-ing twice — roughly halves fleet-wide SSH traffic per run-all.
+- **Resilience (cycle-6):** `ProbeRow.partial` marks rows where every sub-check
+  failed to run (vantage couldn't measure, not "target is dead"), so the report
+  can distinguish a real outage from a measurement failure.
 
 ## [0.2.0] - 2026-07-19
 

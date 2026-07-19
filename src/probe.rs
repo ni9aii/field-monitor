@@ -209,6 +209,11 @@ pub fn run(label: &str, public_ip: &str, targets: &[Target]) -> Vec<ProbeRow> {
         // In Rust now_ms uses SystemTime, so no timer overflow — sane is
         // always true (unlike the bash prototype which used `date`).
         let sane = true;
+        // Partial = every sub-check returned no measurement (vantage couldn't
+        // measure, not "target is dead"). Used by the report to distinguish
+        // "not measured" from a real outage.
+        let partial =
+            dns_ms.is_none() && https_ms.is_none() && tcp_ms.is_none() && icmp_ms.is_none();
         rows.push(ProbeRow {
             server: public_ip.to_string(),
             label: label.to_string(),
@@ -222,6 +227,7 @@ pub fn run(label: &str, public_ip: &str, targets: &[Target]) -> Vec<ProbeRow> {
             icmp,
             icmp_ms,
             sane,
+            partial,
         });
         // Rate-limit between targets (legitimacy: do not spam).
         std::thread::sleep(Duration::from_millis(200));

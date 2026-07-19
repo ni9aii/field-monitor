@@ -26,10 +26,22 @@ fn sh_quote(s: &str) -> String {
 /// Run `field-monitor <subcmd>` on a remote server, passing its public IP
 /// and name. Returns stdout (a log with PROBE_IP=/AUDIT: lines).
 ///
+/// `upload` controls whether the binary is copied to the server first. The
+/// orchestrator copies once (first subcommand) and reuses the deployed binary
+/// for the rest, avoiding a redundant 2nd scp per server.
+///
 /// The remote binary in `/tmp` is cleaned up afterwards (best-effort) so it
-/// does not linger across runs. SSH connections carry explicit timeouts so a
-/// single unresponsive server cannot hang the whole orchestrator.
-pub fn run_remote(server: &ServerEntry, subcmd: &str, bin_local: &str) -> std::io::Result<String> {
+/// The orchestrator copies once (first subcommand) and reuses the deployed binary
+/// for the rest, avoiding a redundant 2nd scp per server. `cleanup` removes the
+/// remote binary afterwards (set on the last subcommand so it survives between
+/// probe and audit).
+pub fn run_remote(
+    server: &ServerEntry,
+    subcmd: &str,
+    bin_local: &str,
+    upload: bool,
+    cleanup: bool,
+) -> std::io::Result<String> {
     let remote = format!("{}@{}", server.user, server.ip);
     let dest = format!("{}:/tmp/field-monitor", remote);
     let ssh_opts = [
@@ -46,28 +58,36 @@ pub fn run_remote(server: &ServerEntry, subcmd: &str, bin_local: &str) -> std::i
         "-o",
         "ServerAliveCountMax=3",
     ];
-    // 1) scp the binary
-    let scp = Command::new("scp")
-        .args(ssh_opts)
-        .args([bin_local, &dest])
-        .output()?;
-    if !scp.status.success() {
-        return Err(std::io::Error::new(
-            ErrorKind::Other,
-            format!(
-                "scp failed ({}): {}",
-                scp.status,
-                String::from_utf8_lossy(&scp.stderr).trim()
-            ),
-        ));
+    // 1) scp the binary (only when requested — orchestrator uploads once).
+    if upload {
+        let scp = Command::new("scp")
+            .args(ssh_opts)
+            .args([bin_local, &dest])
+            .output()?;
+        if !scp.status.success() {
+            return Err(std::io::Error::new(
+                ErrorKind::Other,
+                format!(
+                    "scp failed ({}): {}",
+                    scp.status,
+                    String::from_utf8_lossy(&scp.stderr).trim()
+                ),
+            ));
+        }
     }
-    // 2) ssh run, then clean up the remote binary (best-effort).
+    // 2) ssh run, then (optionally) clean up the remote binary (best-effort).
     // Values are single-quote-escaped to prevent shell injection from config.
+    let cleanup_cmd = if cleanup {
+        "; rm -f /tmp/field-monitor"
+    } else {
+        ""
+    };
     let remote_cmd = format!(
-        "FIELD_PROBE_IP={ip} FIELD_PROBE_NAME={name} /tmp/field-monitor {subcmd}; rm -f /tmp/field-monitor",
+        "FIELD_PROBE_IP={ip} FIELD_PROBE_NAME={name} /tmp/field-monitor {subcmd}{cleanup}",
         ip = sh_quote(&server.ip),
         name = sh_quote(&server.name),
         subcmd = subcmd,
+        cleanup = cleanup_cmd,
     );
     let out = Command::new("ssh")
         .args(ssh_opts)
