@@ -27,6 +27,13 @@ impl Target {
     /// basic character check so a misconfigured/malicious `targets.toml`
     /// cannot smuggle an injection through host/url/ip.
     pub fn is_safe(&self) -> bool {
+        // `name` is written into CSV/AUDIT emit lines (`target,{name},...`) and
+        // parsed downstream, so it must not contain the field/line delimiters
+        // (`,` `|` newlines) or control chars that would corrupt the report.
+        let name_ok = !self.name.is_empty()
+            && !self.name.contains(',')
+            && !self.name.contains('|')
+            && !self.name.chars().any(|c| c.is_control());
         let host_ok = self.host.is_empty()
             || (no_injection_chars(&self.host)
                 && !self.host.contains(':')
@@ -35,7 +42,7 @@ impl Target {
             || (self.url.starts_with("http://") || self.url.starts_with("https://"))
                 && no_injection_chars(&self.url);
         let ip_ok = self.ip.is_empty() || valid_ip(&self.ip);
-        host_ok && url_ok && ip_ok
+        name_ok && host_ok && url_ok && ip_ok
     }
 }
 
@@ -86,6 +93,9 @@ pub struct Config {
     /// Minimum interval between measurements of one target, in seconds (rate-limit).
     #[serde(default = "default_interval")]
     pub min_interval_sec: u64,
+    /// Max number of servers probed in parallel per batch (0 = unlimited).
+    #[serde(default = "default_batch")]
+    pub batch_size: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -116,6 +126,10 @@ fn default_port() -> u16 {
 }
 fn default_interval() -> u64 {
     300
+}
+
+fn default_batch() -> usize {
+    4
 }
 
 /// ISO8601 timestamp without external crates. Used for reports and logs.
@@ -160,6 +174,7 @@ impl Default for Config {
             servers: vec![],
             targets: default_targets(),
             min_interval_sec: 300,
+            batch_size: 4,
         }
     }
 }
@@ -362,6 +377,48 @@ mod tests {
             host: "".into(),
             url: "".into(),
             ip: "2001:db8::1".into()
+        }
+        .is_safe());
+    }
+
+    #[test]
+    fn is_safe_rejects_injection_in_name() {
+        // name is written into CSV/AUDIT emit lines, so delimiters/control
+        // chars must be rejected (closes cycle-5 ARCH-1).
+        assert!(!Target {
+            name: "a,b".into(),
+            host: "".into(),
+            url: "".into(),
+            ip: "".into()
+        }
+        .is_safe());
+        assert!(!Target {
+            name: "x|y".into(),
+            host: "".into(),
+            url: "".into(),
+            ip: "".into()
+        }
+        .is_safe());
+        assert!(!Target {
+            name: "x\ny".into(),
+            host: "".into(),
+            url: "".into(),
+            ip: "".into()
+        }
+        .is_safe());
+        assert!(!Target {
+            name: "".into(),
+            host: "".into(),
+            url: "".into(),
+            ip: "".into()
+        }
+        .is_safe());
+        // a plain name is fine
+        assert!(Target {
+            name: "GitHub".into(),
+            host: "".into(),
+            url: "".into(),
+            ip: "".into()
         }
         .is_safe());
     }

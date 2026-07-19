@@ -43,6 +43,16 @@ fn sshd_value(config: &str, key: &str) -> Option<String> {
         .and_then(|l| l.split_whitespace().nth(1).map(|s| s.to_string()))
 }
 
+/// Resolve an absolute path to the `sshd` binary from a fixed set of trusted
+/// system locations. Returns None if not found in any of them. Using an
+/// absolute path (never a bare `sshd`) prevents a PATH-hijack when the value
+/// is later run under `sudo`.
+fn sshd_abs_path() -> Option<&'static str> {
+    ["/usr/sbin/sshd", "/sbin/sshd", "/usr/bin/sshd"]
+        .into_iter()
+        .find(|p| std::path::Path::new(p).exists())
+}
+
 /// Effective sshd config value, honoring `Include`/`Match` blocks.
 ///
 /// Prefers `sshd -T` (the daemon's own effective-config dump) when it can be
@@ -50,10 +60,13 @@ fn sshd_value(config: &str, key: &str) -> Option<String> {
 /// `/etc/ssh/sshd_config` directly when `sshd -T` is unavailable.
 fn effective_sshd_value(config: &str, key: &str) -> Option<String> {
     if sudo_nopass() {
-        if let Ok(o) = Command::new("sudo").args(["sshd", "-T"]).output() {
-            if o.status.success() {
-                if let Some(v) = sshd_value(&String::from_utf8_lossy(&o.stdout), key) {
-                    return Some(v);
+        if let Some(sshd) = sshd_abs_path() {
+            // Absolute path + `sudo -n` (no prompt); avoids PATH-hijack.
+            if let Ok(o) = Command::new("sudo").args(["-n", sshd, "-T"]).output() {
+                if o.status.success() {
+                    if let Some(v) = sshd_value(&String::from_utf8_lossy(&o.stdout), key) {
+                        return Some(v);
+                    }
                 }
             }
         }

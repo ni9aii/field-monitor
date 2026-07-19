@@ -75,7 +75,7 @@ fn fetch_reference(input: &str) -> Option<(bool, String, String, usize)> {
     let url = match api_url() {
         Ok(u) => format!(
             "{}?country_code={}&test_name=web_connectivity&input={}&limit=10&order_by=measurement_start_time&since={}",
-            u, cc, url_encode(input), since
+            u, url_encode(&cc), url_encode(input), since
         ),
         Err(_) => return Some((false, "False".into(), "".into(), 0)),
     };

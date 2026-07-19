@@ -74,6 +74,11 @@ pub fn load_probe_logs(dir: &Path) -> Vec<ProbeRow> {
             if path.extension().and_then(|x| x.to_str()) != Some("log") {
                 continue;
             }
+            // Skip symlinked `.log` entries — don't read through a planted link
+            // to a sensitive file outside the results dir.
+            if e.file_type().map(|t| t.is_symlink()).unwrap_or(true) {
+                continue;
+            }
             let text = match std::fs::read_to_string(&path) {
                 Ok(t) => t,
                 Err(_) => continue,
@@ -186,8 +191,12 @@ pub fn generate_markdown_report(s: &Summary, out_path: &Path) -> std::io::Result
             .unwrap_or(0),
     );
 
-    // Archive existing report if it exists
-    if out_path.exists() {
+    // Archive existing report if it exists (skip if it's a symlink — don't
+    // read/copy through a planted link).
+    let is_symlink = std::fs::symlink_metadata(out_path)
+        .map(|m| m.file_type().is_symlink())
+        .unwrap_or(false);
+    if out_path.exists() && !is_symlink {
         let stem = out_path.file_stem().unwrap_or_default().to_string_lossy();
         let parent = out_path.parent().unwrap_or(Path::new("."));
         let archive_path = parent.join(format!("{}-{}.md", stem, timestamp));
@@ -282,6 +291,20 @@ pub fn generate_markdown_report(s: &Summary, out_path: &Path) -> std::io::Result
             .push_str("## Anomalies\n\nNone detected (all targets 200/open, latencies normal).\n");
     }
 
+    // Symlink-safe write: refuse to follow a symlink at the report path
+    // (prevents a planted `report.md -> /etc/cron.d/x` from being truncated
+    // and overwritten, esp. when the timer runs as root).
+    if let Ok(meta) = std::fs::symlink_metadata(out_path) {
+        if meta.file_type().is_symlink() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::AlreadyExists,
+                format!(
+                    "refusing to write report through a symlink: {}",
+                    out_path.display()
+                ),
+            ));
+        }
+    }
     let mut file = std::fs::File::create(out_path)?;
     file.write_all(content.as_bytes())
 }
