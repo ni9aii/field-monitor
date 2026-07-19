@@ -8,6 +8,36 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::model::*;
 
+/// Get timeout from env or default (seconds for most operations).
+fn timeout_env(name: &str, default: &str) -> String {
+    std::env::var(name).unwrap_or_else(|_| default.into())
+}
+
+/// DNS timeout in seconds (default: 3).
+fn dns_timeout() -> String {
+    timeout_env("FM_DNS_TIMEOUT", "3")
+}
+
+/// HTTPS timeout in seconds (default: 8).
+fn https_timeout() -> String {
+    timeout_env("FM_HTTPS_TIMEOUT", "8")
+}
+
+/// TCP timeout in seconds (default: 8).
+fn tcp_timeout() -> String {
+    timeout_env("FM_TCP_TIMEOUT", "8")
+}
+
+/// ICMP packet count (default: 3).
+fn ping_count() -> String {
+    timeout_env("FM_PING_COUNT", "3")
+}
+
+/// ICMP timeout per packet in seconds (default: 2).
+fn ping_timeout() -> String {
+    timeout_env("FM_PING_TIMEOUT", "2")
+}
+
 /// Resolve the server's public IP (for the systemd timer when FIELD_PROBE_IP
 /// is not set). Only a passive request to an external service; falls back to
 /// `hostname -I`.
@@ -46,7 +76,12 @@ fn now_ms() -> u64 {
 fn dns_resolve(host: &str) -> Option<(String, u64)> {
     let t0 = now_ms();
     let out = Command::new("dig")
-        .args(["+short", "+time=3", "+tries=1", host])
+        .args([
+            "+short",
+            &format!("+time={}", dns_timeout()),
+            "+tries=1",
+            host,
+        ])
         .output()
         .ok()?;
     let s = String::from_utf8_lossy(&out.stdout);
@@ -60,7 +95,7 @@ fn dns_resolve(host: &str) -> Option<(String, u64)> {
     Some((ip.to_string(), t1.saturating_sub(t0)))
 }
 
-/// HTTPS check via `curl --max-time 8`. Returns (code, ms).
+/// HTTPS check via `curl`. Returns (code, ms).
 fn https_check(url: &str) -> Option<(u16, u64)> {
     let t0 = now_ms();
     let out = Command::new("curl")
@@ -71,7 +106,7 @@ fn https_check(url: &str) -> Option<(u16, u64)> {
             "-w",
             "%{http_code}",
             "--max-time",
-            "8",
+            &https_timeout(),
             url,
         ])
         .output()
@@ -87,9 +122,10 @@ fn https_check(url: &str) -> Option<(u16, u64)> {
 /// TCP:443 check via python3 socket. Returns (state, ms).
 fn tcp_check(host: &str, port: u16) -> (String, Option<u64>) {
     let py = format!(
-        "import socket,time\nt0=time.time()\ntry:\n s=socket.create_connection(('{h}',{p}),timeout=8); s.close()\n print('open',int((time.time()-t0)*1000))\nexcept Exception:\n print('closed',int((time.time()-t0)*1000))",
+        "import socket,time\nt0=time.time()\ntry:\n s=socket.create_connection('{h}',{p},timeout={t}); s.close()\n print('open',int((time.time()-t0)*1000))\nexcept Exception:\n print('closed',int((time.time()-t0)*1000))",
         h = host,
-        p = port
+        p = port,
+        t = tcp_timeout()
     );
     let out = Command::new("python3").args(["-c", &py]).output();
     match out {
@@ -107,7 +143,7 @@ fn tcp_check(host: &str, port: u16) -> (String, Option<u64>) {
 /// ICMP check via `ping`. Returns (state, ms).
 fn icmp_check(ip: &str) -> (String, Option<u64>) {
     let out = Command::new("ping")
-        .args(["-c", "3", "-W", "2", ip])
+        .args(["-c", &ping_count(), "-W", &ping_timeout(), ip])
         .output();
     match out {
         Ok(o) if o.status.success() => {
