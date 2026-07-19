@@ -4,6 +4,7 @@
 mod aggregate;
 mod audit;
 mod corroborate;
+mod logfmt;
 mod model;
 mod probe;
 mod ssh;
@@ -111,18 +112,7 @@ fn cmd_probe() {
     let rows = probe::run(&label, &ip, &cfg.targets);
     println!("PROBE_IP={} NAME={}", ip, label);
     for r in &rows {
-        println!(
-            "target,{},{},{},{},{},{},{},{},{}",
-            r.target,
-            r.dns_ip,
-            fnum(r.dns_ms),
-            r.https_code.map(|c| c.to_string()).unwrap_or("-".into()),
-            fnum(r.https_ms),
-            r.tcp,
-            fnum(r.tcp_ms),
-            r.icmp,
-            fnum(r.icmp_ms),
-        );
+        println!("{}", logfmt::emit_probe_row(r));
     }
     // Debug JSON (not in the log by default, but available).
     if std::env::var("FIELD_MONITOR_JSON").is_ok() {
@@ -202,8 +192,13 @@ fn cmd_run_all() {
                         self_bin.clone()
                     };
                     let mut out_lines: Vec<String> = Vec::new();
-                    for sub in ["probe", "audit"] {
-                        match ssh::run_remote(srv, sub, &bin) {
+                    // Run probe + audit with a single scp upload (first
+                    // subcommand only) and a single cleanup (last subcommand).
+                    let subs = ["probe", "audit"];
+                    for (idx, sub) in subs.iter().enumerate() {
+                        let upload = idx == 0;
+                        let cleanup = idx == subs.len() - 1;
+                        match ssh::run_remote(srv, sub, &bin, upload, cleanup) {
                             Ok(out) => {
                                 for line in out.lines() {
                                     // Remote stderr lines (errors like "Exec format error")
@@ -262,9 +257,4 @@ fn cmd_aggregate() {
     if std::env::var("FIELD_MONITOR_JSON").is_ok() {
         println!("{}", serde_json::to_string(&s).unwrap_or_default());
     }
-}
-
-/// Format an optional metric as a string (`-` when absent).
-fn fnum(v: Option<u64>) -> String {
-    v.map(|x| x.to_string()).unwrap_or("-".into())
 }
