@@ -12,7 +12,7 @@ Workflow: `.github/workflows/ci.yml`. Runs on every push and PR.
 | `clippy` | ubuntu + macos | `cargo clippy -D warnings` |
 | `test` | ubuntu + macos | `cargo test --release` |
 | `build` | ubuntu + macos | `cargo build --release` |
-| `native-aarch64` | ubuntu (QEMU) | native build in `arm64v8/rust:1-bookworm` |
+| `native-aarch64` | ubuntu (QEMU) | native build **+ test** in `arm64v8/rust:1-bookworm` |
 
 ### Why a native aarch64 container
 
