@@ -1,6 +1,6 @@
 [package]
 name = "field-monitor"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2021"
 description = "Passive reachability monitoring of operator-defined public endpoints from own servers + read-only security audit (legitimate, allowlist-only)"
 license = "GPL-3.0"
