@@ -13,9 +13,13 @@ use crate::model::*;
 /// Public reference measurement API (operator-configured via env).
 /// API endpoint is operator-configured via CORRO_API_URL env.
 /// No hardcoded default in this repo — the operator MUST set it.
-fn api_url() -> String {
-    std::env::var("CORRO_API_URL")
-        .expect("CORRO_API_URL must be set (operator-configured reference API)")
+fn api_url() -> std::io::Result<String> {
+    std::env::var("CORRO_API_URL").map_err(|_| {
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "CORRO_API_URL must be set (operator-configured reference API)",
+        )
+    })
 }
 
 /// Country code to cross-check (operator-configured via env,
@@ -50,10 +54,13 @@ fn fetch_reference(input: &str) -> Option<(bool, String, String, usize)> {
         .saturating_sub(30 * 24 * 3600);
     let since = chrono_like(secs);
     let cc = probe_cc();
-    let url = format!(
-        "{}?country_code={}&test_name=web_connectivity&input={}&limit=10&order_by=measurement_start_time&since={}",
-        api_url(), cc, input, since
-    );
+    let url = match api_url() {
+        Ok(u) => format!(
+            "{}?country_code={}&test_name=web_connectivity&input={}&limit=10&order_by=measurement_start_time&since={}",
+            u, cc, input, since
+        ),
+        Err(_) => return Some((false, "no-api-url".into(), "".into(), 0)),
+    };
     let out = std::process::Command::new("curl")
         .args(["-s", "--max-time", "25", &url])
         .output()
