@@ -7,6 +7,7 @@ mod corroborate;
 mod logfmt;
 mod model;
 mod probe;
+mod runner;
 mod ssh;
 
 use std::path::PathBuf;

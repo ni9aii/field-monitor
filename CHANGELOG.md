@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] - 2026-07-19
 
 ### Added
 
@@ -81,6 +81,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Resilience (cycle-6):** `ProbeRow.partial` marks rows where every sub-check
   failed to run (vantage couldn't measure, not "target is dead"), so the report
   can distinguish a real outage from a measurement failure.
+- **Testability (cycle-7):** new `src/runner.rs` with a `CommandRunner` trait
+  and `RealRunner` default; `probe::dns_resolve`/`https_check`/`run_with` take
+  `&dyn CommandRunner`, so they are now unit-tested with an in-memory
+  `MockRunner` (no real network/filesystem). Closes the last architecture
+  review finding (modules with hardcoded `Command` were not mockable).
 
 ## [0.2.0] - 2026-07-19
 
