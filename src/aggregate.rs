@@ -174,7 +174,7 @@ pub fn print_summary(s: &Summary) {
 pub fn generate_markdown_report(s: &Summary, out_path: &Path) -> std::io::Result<()> {
     use std::io::Write;
 
-    let timestamp = chrono_like_report(
+    let timestamp = crate::model::timestamp_iso8601(
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs())
@@ -280,41 +280,7 @@ pub fn generate_markdown_report(s: &Summary, out_path: &Path) -> std::io::Result
     file.write_all(content.as_bytes())
 }
 
-/// ISO8601-like timestamp for report header.
-fn chrono_like_report(secs: u64) -> String {
-    let days = secs / 86400;
-    let mut year = 1970;
-    let mut d = days;
-    let month_days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    while d >= 365 {
-        let leap = if (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0) {
-            366
-        } else {
-            365
-        };
-        if d >= leap {
-            d -= leap;
-            year += 1;
-        } else {
-            break;
-        }
-    }
-    let mut month = 0;
-    while month < 12 && d >= month_days[month] {
-        d -= month_days[month];
-        month += 1;
-    }
-    let day = d + 1;
-    let mon = month + 1;
-    let rem = secs % 86400;
-    let hour = rem / 3600;
-    let min = (rem % 3600) / 60;
-    let sec = rem % 60;
-    format!(
-        "{:02}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
-        year, mon, day, hour, min, sec
-    )
-}
+
 
 #[cfg(test)]
 mod tests {
