@@ -30,7 +30,8 @@ fn read_file(path: &str) -> Option<String> {
     std::fs::read_to_string(path).ok()
 }
 
-/// Extract a `key value` from an sshd_config-style file.
+/// Extract a `key value` from an sshd_config-style file (first match; does
+/// NOT follow `Include`/`Match` — see `effective_sshd_value` for that).
 fn sshd_value(config: &str, key: &str) -> Option<String> {
     config
         .lines()
@@ -40,6 +41,24 @@ fn sshd_value(config: &str, key: &str) -> Option<String> {
                 .starts_with(&format!("{} ", key.to_lowercase()))
         })
         .and_then(|l| l.split_whitespace().nth(1).map(|s| s.to_string()))
+}
+
+/// Effective sshd config value, honoring `Include`/`Match` blocks.
+///
+/// Prefers `sshd -T` (the daemon's own effective-config dump) when it can be
+/// run (needs root / passwordless sudo); falls back to parsing
+/// `/etc/ssh/sshd_config` directly when `sshd -T` is unavailable.
+fn effective_sshd_value(config: &str, key: &str) -> Option<String> {
+    if sudo_nopass() {
+        if let Ok(o) = Command::new("sudo").args(["sshd", "-T"]).output() {
+            if o.status.success() {
+                if let Some(v) = sshd_value(&String::from_utf8_lossy(&o.stdout), key) {
+                    return Some(v);
+                }
+            }
+        }
+    }
+    sshd_value(config, key)
 }
 
 /// ufw firewall status (or "none" if not installed).
@@ -136,9 +155,11 @@ pub fn run(label: &str, public_ip: &str) -> AuditRow {
         })
         .unwrap_or_else(|| "unknown".into());
     let sshd = read_file("/etc/ssh/sshd_config").unwrap_or_default();
-    let ssh_port = sshd_value(&sshd, "Port").unwrap_or_else(|| "22".into());
-    let ssh_pw = sshd_value(&sshd, "PasswordAuthentication").unwrap_or_else(|| "default".into());
-    let ssh_root = sshd_value(&sshd, "PermitRootLogin").unwrap_or_else(|| "default".into());
+    let ssh_port = effective_sshd_value(&sshd, "Port").unwrap_or_else(|| "22".into());
+    let ssh_pw =
+        effective_sshd_value(&sshd, "PasswordAuthentication").unwrap_or_else(|| "default".into());
+    let ssh_root =
+        effective_sshd_value(&sshd, "PermitRootLogin").unwrap_or_else(|| "default".into());
     let ports = listeners().join(",");
     AuditRow {
         ip: public_ip.to_string(),

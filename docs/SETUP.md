@@ -78,6 +78,30 @@ No root on the servers — only your SSH user.
 
 Logs live at `~/.local/share/field-monitor/*.log` on each server.
 
+### Log rotation (recommended)
+
+The agent appends to a single `probe.log` per server and never rotates it
+itself. On a long-lived server this file grows without bound and the
+aggregator reads the whole file each run. Set up rotation on each server, e.g.
+a systemd `logrotate` drop-in:
+
+```conf
+# /etc/logrotate.d/field-monitor
+/home/USER/.local/share/field-monitor/*.log {
+    monthly
+    rotate 12
+    compress
+    delaycompress
+    copytruncate
+    missingok
+    notifempty
+}
+```
+
+`copytruncate` lets the running agent keep its file handle while the log is
+rotated. Alternatively, point the service at `journald` instead of a file and
+let `journald` handle retention.
+
 ## 5. Enable linger
 
 On each server (once):
