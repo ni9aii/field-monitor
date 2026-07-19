@@ -1,11 +1,12 @@
 //! ssh — orchestration: copy the binary to a server and run it remotely.
 //! Legitimate: only our servers, our keys, an explicit target allowlist.
 
-use std::io::ErrorKind;
+use std::io::{Error, ErrorKind};
 use std::process::Command;
 
 use crate::model::*;
 
+#[allow(clippy::io_other_error)]
 /// Run `field-monitor <subcmd>` on a remote server, passing its public IP
 /// and name. Returns stdout (a log with PROBE_IP=/AUDIT: lines).
 pub fn run_remote(server: &ServerEntry, subcmd: &str, bin_local: &str) -> std::io::Result<String> {
@@ -51,12 +52,15 @@ pub fn run_remote(server: &ServerEntry, subcmd: &str, bin_local: &str) -> std::i
         ])
         .output()?;
     if !out.status.success() {
-        return Err(std::io::Error::other(format!(
-            "ssh {} failed ({}): {}",
-            subcmd,
-            out.status,
-            String::from_utf8_lossy(&out.stderr).trim()
-        )));
+        return Err(Error::new(
+            ErrorKind::Other,
+            format!(
+                "ssh {} failed ({}): {}",
+                subcmd,
+                out.status,
+                String::from_utf8_lossy(&out.stderr).trim()
+            ),
+        ));
     }
     let mut s = String::from_utf8_lossy(&out.stdout).to_string();
     // Remote stderr (e.g. "Exec format error" on an arch mismatch);
