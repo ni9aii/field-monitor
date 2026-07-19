@@ -3,6 +3,7 @@
 //! v1 wraps system tools (curl/dig/ping) via `std::process::Command`.
 //! It does NOT scan third-party hosts and does NOT generate load.
 
+use std::net::{TcpStream, ToSocketAddrs};
 use std::process::Command;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -39,17 +40,24 @@ fn ping_timeout() -> String {
 }
 
 /// Resolve the server's public IP (for the systemd timer when FIELD_PROBE_IP
-/// is not set). Only a passive request to an external service; falls back to
-/// `hostname -I`.
+/// is not set). The external lookup endpoint is operator-configurable via
+/// `FM_PUBLIC_IP_URL` and **disabled by default** — when unset we only fall
+/// back to local interfaces (`hostname -I`), so there is no hardcoded outbound
+/// call and no third party learns the vantage point's IP. This keeps the
+/// project's "no hardcoded hosts / no undisclosed outbound" guarantee.
 pub fn resolve_public_ip() -> Option<String> {
-    // First try ifconfig.me (passive, like a normal client).
-    if let Ok(o) = Command::new("curl")
-        .args(["-s", "--max-time", "5", "https://ifconfig.me"])
-        .output()
-    {
-        let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
-        if s.split('.').count() == 4 && s.split('.').all(|p| p.parse::<u8>().is_ok()) {
-            return Some(s);
+    // Optional external lookup (operator opt-in only).
+    if let Ok(url) = std::env::var("FM_PUBLIC_IP_URL") {
+        if !url.trim().is_empty() {
+            if let Ok(o) = Command::new("curl")
+                .args(["-s", "--max-time", "5", &url])
+                .output()
+            {
+                let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
+                if s.split('.').count() == 4 && s.split('.').all(|p| p.parse::<u8>().is_ok()) {
+                    return Some(s);
+                }
+            }
         }
     }
     // Fallback: local interfaces (may yield an internal IP — worse, but ok for logging).
@@ -119,24 +127,24 @@ fn https_check(url: &str) -> Option<(u16, u64)> {
     Some((code, t1.saturating_sub(t0)))
 }
 
-/// TCP:443 check via python3 socket. Returns (state, ms).
+/// TCP check via native Rust socket (no python3 subprocess → no command
+/// injection via the `host` value). Returns (state, ms).
 fn tcp_check(host: &str, port: u16) -> (String, Option<u64>) {
-    let py = format!(
-        "import socket,time\nt0=time.time()\ntry:\n s=socket.create_connection('{h}',{p},timeout={t}); s.close()\n print('open',int((time.time()-t0)*1000))\nexcept Exception:\n print('closed',int((time.time()-t0)*1000))",
-        h = host,
-        p = port,
-        t = tcp_timeout()
-    );
-    let out = Command::new("python3").args(["-c", &py]).output();
-    match out {
-        Ok(o) => {
-            let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
-            let mut parts = s.split_whitespace();
-            let st = parts.next().unwrap_or("closed").to_string();
-            let ms = parts.next().and_then(|v| v.parse::<u64>().ok());
-            (st, ms)
-        }
-        Err(_) => ("closed".into(), None),
+    let t0 = now_ms();
+    let timeout = Duration::from_secs(tcp_timeout().parse::<u64>().unwrap_or(8));
+    let addr = format!("{}:{}", host, port);
+    let connected = addr
+        .to_socket_addrs()
+        .ok()
+        .and_then(|mut iter| iter.next())
+        .map(|sa| TcpStream::connect_timeout(&sa, timeout).is_ok())
+        .unwrap_or(false);
+    let t1 = now_ms();
+    let ms = Some(t1.saturating_sub(t0));
+    if connected {
+        ("open".into(), ms)
+    } else {
+        ("closed".into(), ms)
     }
 }
 
