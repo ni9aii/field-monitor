@@ -28,6 +28,24 @@ fn probe_cc() -> String {
     std::env::var("CORRO_CC").unwrap_or_default()
 }
 
+/// Percent-encode a query parameter value (RFC 3986 unreserved set).
+/// Prevents `&`/`#`/`?` in a target URL from breaking the API query string.
+fn url_encode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char)
+            }
+            _ => {
+                out.push('%');
+                out.push_str(&format!("{:02X}", b));
+            }
+        }
+    }
+    out
+}
+
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct CorroRow {
     pub target: String,
@@ -57,9 +75,9 @@ fn fetch_reference(input: &str) -> Option<(bool, String, String, usize)> {
     let url = match api_url() {
         Ok(u) => format!(
             "{}?country_code={}&test_name=web_connectivity&input={}&limit=10&order_by=measurement_start_time&since={}",
-            u, cc, input, since
+            u, cc, url_encode(input), since
         ),
-        Err(_) => return Some((false, "no-api-url".into(), "".into(), 0)),
+        Err(_) => return Some((false, "False".into(), "".into(), 0)),
     };
     let out = std::process::Command::new("curl")
         .args(["-s", "--max-time", "25", &url])
