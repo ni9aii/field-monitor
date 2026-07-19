@@ -12,11 +12,12 @@ use std::path::PathBuf;
 
 use model::*;
 
-/// Print servers as `ip|name|key|port|user` (for CI/CD scripts).
+/// Print servers (for CI/CD scripts). The private key PATH is deliberately
+/// redacted — it must not leak into logs/scripts.
 fn cmd_list_servers() {
     let cfg = load_config();
     for s in &cfg.servers {
-        println!("{}|{}|{}|{}|{}", s.ip, s.name, s.key, s.port, s.user);
+        println!("{}|{}|<redacted>|{}|{}", s.ip, s.name, s.port, s.user);
     }
 }
 
@@ -171,36 +172,69 @@ fn cmd_run_all() {
     let self_exe = std::env::current_exe().unwrap_or_default();
     let self_bin = self_exe.to_string_lossy().to_string();
     println!(
-        "=== field-monitor run-all: {} servers (rate-limit {}s/target) ===",
+        "=== field-monitor run-all: {} servers (rate-limit {}s/target, max 4 in parallel) ===",
         cfg.servers.len(),
         cfg.min_interval_sec
     );
-    for (i, srv) in cfg.servers.iter().enumerate() {
-        let bin = if srv.arch.trim() == "aarch64" {
-            model::bin_for_arch(&srv.arch, &self_exe)
-                .to_string_lossy()
-                .to_string()
-        } else {
-            self_bin.clone()
-        };
-        for sub in ["probe", "audit"] {
-            match ssh::run_remote(srv, sub, &bin) {
-                Ok(out) => {
-                    for line in out.lines() {
-                        // Remote stderr lines (errors like "Exec format error")
-                        // are also printed so a server doesn't vanish silently.
-                        if line.starts_with("# remote-stderr:")
-                            || line.starts_with("PROBE_IP=")
-                            || line.starts_with("AUDIT:")
-                            || line.contains("target,")
-                        {
-                            println!("[{}] {} -> {}", i + 1, srv.ip, line);
+    // Limit parallelism to batches of 4 so a fleet of servers does not
+    // fork-bomb the operator host, and so one unresponsive server (now
+    // timeout-guarded in ssh.rs) cannot block the rest.
+    let min_interval = cfg.min_interval_sec;
+    let servers = &cfg.servers;
+    let mut start = 0;
+    while start < servers.len() {
+        let end = (start + 4).min(servers.len());
+        std::thread::scope(|scope| {
+            for (i, srv) in servers.iter().enumerate().skip(start).take(end - start) {
+                let self_bin = self_bin.clone();
+                let self_exe = self_exe.clone();
+                scope.spawn(move || {
+                    let bin = if srv.arch.trim() == "aarch64" {
+                        model::bin_for_arch(&srv.arch, &self_exe)
+                            .to_string_lossy()
+                            .to_string()
+                    } else {
+                        self_bin.clone()
+                    };
+                    let mut out_lines: Vec<String> = Vec::new();
+                    for sub in ["probe", "audit"] {
+                        match ssh::run_remote(srv, sub, &bin) {
+                            Ok(out) => {
+                                for line in out.lines() {
+                                    // Remote stderr lines (errors like "Exec format error")
+                                    // are also collected so a server doesn't vanish silently.
+                                    if line.starts_with("# remote-stderr:")
+                                        || line.starts_with("PROBE_IP=")
+                                        || line.starts_with("AUDIT:")
+                                        || line.contains("target,")
+                                    {
+                                        out_lines.push(format!(
+                                            "[{}] {} -> {}",
+                                            i + 1,
+                                            srv.ip,
+                                            line
+                                        ));
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                out_lines.push(format!("[{}] {} — error: {}", i + 1, srv.ip, e))
+                            }
                         }
                     }
-                }
-                Err(e) => eprintln!("[{}] {} — error: {}", i + 1, srv.ip, e),
+                    // Print this server's block atomically to avoid interleaving.
+                    let block = out_lines.join("\n");
+                    if !block.is_empty() {
+                        println!("{}", block);
+                    }
+                });
             }
+        });
+        // Rate-limit: minimum pause between server batches (fleet throttle).
+        if min_interval > 0 {
+            std::thread::sleep(std::time::Duration::from_secs(min_interval));
         }
+        start = end;
     }
 }
 
