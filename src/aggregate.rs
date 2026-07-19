@@ -14,9 +14,9 @@ pub fn parse_audit_line(line: &str) -> Option<AuditRow> {
     if p.len() < 11 {
         return None;
     }
-    // Defensive: use get() to avoid panic on malformed input
+    // Defensive: use first() to avoid panic on malformed input (clippy-friendly)
     Some(AuditRow {
-        ip: p.get(0).map(|s| s.to_string())?,
+        ip: p.first().map(|s| s.to_string())?,
         name: p.get(1).map(|s| s.to_string())?,
         sudo_nopass: p.get(2).map(|s| s.to_string())?,
         os: p.get(3).map(|s| s.to_string())?,
