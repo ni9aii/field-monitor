@@ -196,6 +196,16 @@ pub fn generate_markdown_report(s: &Summary, out_path: &Path) -> std::io::Result
     content.push_str(&format!("**Generated:** {}\n\n", timestamp));
     content.push_str(&format!("**Vantage points:** {}\n\n", s.n_points));
 
+    // Executive summary
+    if !s.anomalies.is_empty() {
+        content.push_str(&format!(
+            "**Anomalies:** {} (see below)\n\n",
+            s.anomalies.len()
+        ));
+    } else {
+        content.push_str("**Status:** All OK\n\n");
+    }
+
     // Group rows by server, take latest per target
     let mut server_rows: BTreeMap<String, Vec<&ProbeRow>> = BTreeMap::new();
     for r in &s.rows {
