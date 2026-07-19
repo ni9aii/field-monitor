@@ -9,17 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+## [0.2.0] - 2026-07-19
+
+### Added
+
 - `docs/` with detailed guides: SETUP, CONFIG, ARCHITECTURE, CI, LEGITIMACY.
+- Configurable probe timeouts via environment variables:
+  `FM_DNS_TIMEOUT`, `FM_HTTPS_TIMEOUT`, `FM_TCP_TIMEOUT`,
+  `FM_PING_COUNT`, `FM_PING_TIMEOUT`.
+- Unit tests for probe module (parse_curl_code, timeout_env helpers).
 
 ### Changed
 
 - `AUTH.md` moved to `docs/LEGITIMACY.md`.
 - All source comments unified to English with Doxygen-style doc-comments;
   user-facing CLI output translated to English.
-- CI actions modernized to Node 24: `checkout@v5`, `upload-artifact@v7`,
-  `setup-qemu-action@v4`, and `actions/cache` replaced with
-  `Swatinem/rust-cache@v2` (Rust-aware caching). Clears all Node 20
-  deprecation warnings.
+- CI actions modernized: Node 24, `checkout@v5`, `Swatinem/rust-cache@v2`.
+- **Fixes from AutoDev Review:**
+  - Fixed `trim_matches('\')` to `trim()` in `parse_audit_line`.
+  - Added defensive bounds checks using `.first()` and `.get().map()`.
+  - Changed Snyk security scan from weekly to daily schedule.
 
 ## [0.1.0] - 2026-07-16
 
