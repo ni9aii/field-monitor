@@ -42,6 +42,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   querying the reference API (prevents `&`/`#`/`?` from breaking the query),
   and the no-API fallback reports `ref_anomaly = "False"` (was the
   non-contractual string `"no-api-url"`).
+- **Audit accuracy:** `audit` now prefers `sshd -T` (effective config) when
+  run with privileges, so `Include`/`Match` blocks are honored; falls back to
+  parsing `/etc/ssh/sshd_config` when `sshd -T` is unavailable.
+- **Report correctness:** the markdown report now distinguishes a real
+  success (`OK`) from "could not measure" (`NOT MEASURED`) instead of always
+  labelling unmeasured rows `OK`.
+- **Docs:** SETUP documents log rotation (`logrotate`/`journald`) for the
+  per-server `probe.log`, which the agent does not rotate itself.
 
 ## [0.2.0] - 2026-07-19
 

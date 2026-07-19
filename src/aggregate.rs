@@ -229,14 +229,15 @@ pub fn generate_markdown_report(s: &Summary, out_path: &Path) -> std::io::Result
             content
                 .push_str("|--------|--------|-------|--------------|----------|-----|------|\n");
             for r in latest.values() {
-                let status = if r.https_code == Some(200) && (r.tcp == "open" || r.tcp == "-") {
-                    "OK"
-                } else if r.tcp == "closed" {
+                // Status: distinguish a real success from "could not measure".
+                let status = if r.tcp == "closed" {
                     "BLOCKED"
                 } else if r.https_ms.map(|m| m > 2000).unwrap_or(false) {
                     "SLOW"
-                } else {
+                } else if r.https_code == Some(200) || r.tcp == "open" || r.icmp == "ok" {
                     "OK"
+                } else {
+                    "NOT MEASURED"
                 };
                 content.push_str(&format!(
                     "| {} | {} | {} | {} | {} | {} | {} | {}\n",
