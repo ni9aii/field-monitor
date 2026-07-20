@@ -76,8 +76,10 @@ pub fn load_probe_logs(dir: &Path) -> Vec<ProbeRow> {
                 continue;
             }
             // Skip symlinked `.log` entries — don't read through a planted link
-            // to a sensitive file outside the results dir.
-            if e.file_type().map(|t| t.is_symlink()).unwrap_or(true) {
+            // to a sensitive file outside the results dir. On some filesystems
+            // (e.g. btrfs) `file_type()` can fail; treat that as "not a symlink"
+            // rather than skipping the file, otherwise every real log is dropped.
+            if e.file_type().map(|t| t.is_symlink()).unwrap_or(false) {
                 continue;
             }
             let text = match std::fs::read_to_string(&path) {
@@ -399,6 +401,35 @@ mod tests {
         assert_eq!(rows[1].target, "resolver");
         assert_eq!(rows[1].icmp, "ok");
         // cleanup
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn load_probe_logs_reads_real_log_files() {
+        // Regression test: load_probe_logs must NOT skip regular .log files
+        // when std::fs::file_type() is unreliable (e.g. btrfs where it can
+        // return Err). Before the fix the symlink check used unwrap_or(true),
+        // which dropped every log and produced an empty report.
+        let dir = std::env::temp_dir().join("fm_test_real_logs");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("server-a.log"),
+            "PROBE_IP=10.0.0.1 NAME=A\ntarget,example,1.2.3.4,32,200,391,open,77,-,-,0\n",
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("server-b.log"),
+            "PROBE_IP=10.0.0.2 NAME=B\ntarget,example,1.2.3.4,32,0,8029,closed,8030,-,-,0\n",
+        )
+        .unwrap();
+        // a non-log file must be ignored
+        std::fs::write(dir.join("notes.txt"), "ignore me").unwrap();
+
+        let rows = load_probe_logs(Path::new(&dir));
+        assert_eq!(rows.len(), 2, "both .log files must be read");
+        assert!(rows.iter().any(|r| r.server == "10.0.0.1" && r.https_code == Some(200)));
+        assert!(rows.iter().any(|r| r.server == "10.0.0.2" && r.https_code == Some(0)));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
