@@ -209,6 +209,10 @@ pub struct ProbeRow {
     /// true = at least one sub-check (DNS/HTTPS/TCP/ICMP) failed to run, so the
     /// row is a partial result, not a definitive "target is dead" verdict.
     pub partial: bool,
+    /// Unix timestamp (seconds) of when this measurement was taken. Used by
+    /// `aggregate` to window anomalies to the last hour instead of cumulatively.
+    /// `0` = unknown (older agents that did not emit it).
+    pub ts: u64,
 }
 
 /// A security-audit row.
