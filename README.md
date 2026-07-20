@@ -59,6 +59,8 @@ FIELD_PROBE_IP=YOUR_SERVER_IP ./target/release/field-monitor audit
 ./target/release/field-monitor corroborate
 # 6. Generate markdown report (latest per target, anomalies only)
 FIELD_MONITOR_MD=/path/to/report.md ./target/release/field-monitor aggregate
+# 7. (Optional) Collect logs from all servers via scripts/collect.sh
+./scripts/collect-and-report.sh
 ```
 
 For production deployment (systemd user-units, multi-server orchestration,

@@ -19,7 +19,7 @@ use model::*;
 fn cmd_list_servers() {
     let cfg = load_config();
     for s in &cfg.servers {
-        println!("{}|{}|<redacted>|{}|{}", s.ip, s.name, s.port, s.user);
+        println!("{}|{}|{}|{}|{}", s.ip, s.name, s.key, s.port, s.user);
     }
 }
 

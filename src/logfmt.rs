@@ -59,13 +59,15 @@ pub fn parse_probe_line(line: &str, server_ip: &str, server_label: &str) -> Opti
     // Strip an optional run-all prefix like "[2] 1.2.3.4 -> ".
     let csv = line.find(PROBE_PREFIX).map(|idx| &line[idx..])?;
     let f: Vec<&str> = csv.split(',').collect();
-    // f[0] == "target" (literal); data is shifted by +1. 11 fields total
-    // (target + 10 payload incl. trailing `partial`).
-    if f.len() != PROBE_FIELDS + 1 || !f[1].chars().next().is_some_and(|c| c.is_alphabetic()) {
+    // Accept both formats for backward compatibility with older agents:
+    //   10 fields: target,dns_ip,dns_ms,https_code,https_ms,tcp,tcp_ms,icmp,icmp_ms
+    //   11 fields: ... + trailing `partial` (newer agents, via emit_probe_row)
+    // Reject anything shorter than 10 or lines whose 2nd field isn't a target name.
+    if f.len() < 10 || !f[1].chars().next().is_some_and(|c| c.is_alphabetic()) {
         return None;
     }
     let parse_u = |s: &str| s.parse::<u64>().ok();
-    let partial = f[10] == "1";
+    let partial = f.get(10).map(|v| *v == "1").unwrap_or(false);
     let row = ProbeRow {
         server: server_ip.to_string(),
         label: server_label.to_string(),
