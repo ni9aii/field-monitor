@@ -222,6 +222,11 @@ pub fn run_with(
         // In Rust now_ms uses SystemTime, so no timer overflow — sane is
         // always true (unlike the bash prototype which used `date`).
         let sane = true;
+        // Window timestamp: when this measurement was taken (unix secs).
+        let ts = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
         // Partial = every sub-check returned no measurement (vantage couldn't
         // measure, not "target is dead"). Used by the report to distinguish
         // "not measured" from a real outage.
@@ -241,6 +246,7 @@ pub fn run_with(
             icmp_ms,
             sane,
             partial,
+            ts,
         });
         // Rate-limit between targets (legitimacy: do not spam).
         std::thread::sleep(Duration::from_millis(200));

@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 use std::path::Path;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::logfmt;
 use crate::model::*;
@@ -34,11 +35,24 @@ pub fn parse_audit_line(line: &str) -> Option<AuditRow> {
 }
 
 /// Aggregate `ProbeRow`s into a `Summary` and compute anomalies.
+/// Anomalies are windowed to the LAST HOUR only: rows whose `ts`
+/// is present and older than 3600s are skipped. Rows with `ts == 0`
+/// (older agents that did not emit a timestamp) are kept — this lets the
+/// report stay correct during the rollout before every server is updated.
 pub fn summarize(rows: Vec<ProbeRow>) -> Summary {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let cutoff = now.saturating_sub(3600);
     let mut servers: BTreeMap<String, String> = BTreeMap::new();
     let mut anomalies = Vec::new();
     for r in &rows {
         servers.entry(r.server.clone()).or_insert(r.label.clone());
+        // Window to the last hour: skip stale rows that DO carry a ts.
+        if r.ts != 0 && r.ts < cutoff {
+            continue;
+        }
         let bad = r.sane
             && (r.https_code.is_some_and(|c| c != 200)
                 || r.https_ms.is_some_and(|m| m > 2000)
@@ -333,6 +347,7 @@ mod tests {
             icmp_ms: Some(5),
             sane: true,
             partial: false,
+            ts: 0,
         }];
         let s = summarize(rows);
         assert_eq!(s.anomalies.len(), 1);
@@ -355,6 +370,7 @@ mod tests {
             icmp_ms: Some(5),
             sane: true,
             partial: false,
+            ts: 0,
         }];
         let s = summarize(rows);
         assert_eq!(s.anomalies.len(), 1);
@@ -376,6 +392,7 @@ mod tests {
             icmp_ms: Some(5),
             sane: true,
             partial: false,
+            ts: 0,
         }];
         let s = summarize(rows);
         assert!(s.anomalies.is_empty());
@@ -428,8 +445,81 @@ mod tests {
 
         let rows = load_probe_logs(Path::new(&dir));
         assert_eq!(rows.len(), 2, "both .log files must be read");
-        assert!(rows.iter().any(|r| r.server == "10.0.0.1" && r.https_code == Some(200)));
-        assert!(rows.iter().any(|r| r.server == "10.0.0.2" && r.https_code == Some(0)));
+        assert!(rows
+            .iter()
+            .any(|r| r.server == "10.0.0.1" && r.https_code.is_some_and(|c| c == 200)));
+        assert!(rows
+            .iter()
+            .any(|r| r.server == "10.0.0.2" && r.https_code.is_some_and(|c| c == 0)));
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn summarize_windows_to_last_hour() {
+        // Rows without ts (older agents) are always counted.
+        // Rows with ts older than 1h are skipped; fresh ones counted.
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let old = now.saturating_sub(7200); // 2h ago
+        let fresh = now.saturating_sub(60); // 1 min ago
+        let rows = vec![
+            ProbeRow {
+                server: "10.0.0.1".into(),
+                label: "A".into(),
+                target: "apple".into(),
+                dns_ip: "-".into(),
+                dns_ms: None,
+                https_code: Some(0), // bad, but stale -> skipped
+                https_ms: Some(8029),
+                tcp: "closed".into(),
+                tcp_ms: Some(8030),
+                icmp: "-".into(),
+                icmp_ms: None,
+                sane: true,
+                partial: false,
+                ts: old,
+            },
+            ProbeRow {
+                server: "10.0.0.2".into(),
+                label: "B".into(),
+                target: "apple".into(),
+                dns_ip: "-".into(),
+                dns_ms: None,
+                https_code: Some(0), // bad, fresh -> counted
+                https_ms: Some(8029),
+                tcp: "closed".into(),
+                tcp_ms: Some(8030),
+                icmp: "-".into(),
+                icmp_ms: None,
+                sane: true,
+                partial: false,
+                ts: fresh,
+            },
+            ProbeRow {
+                server: "10.0.0.3".into(),
+                label: "C".into(),
+                target: "apple".into(),
+                dns_ip: "-".into(),
+                dns_ms: None,
+                https_code: Some(0), // bad, no ts -> kept (rollout compat)
+                https_ms: Some(8029),
+                tcp: "closed".into(),
+                tcp_ms: Some(8030),
+                icmp: "-".into(),
+                icmp_ms: None,
+                sane: true,
+                partial: false,
+                ts: 0,
+            },
+        ];
+        let s = summarize(rows);
+        // Only the fresh (10.0.0.2) and the no-ts (10.0.0.3) are anomalies;
+        // the 2h-old one is skipped.
+        assert_eq!(s.anomalies.len(), 2, "stale row must be windowed out");
+        assert!(s.anomalies.iter().any(|a| a.ip == "10.0.0.2"));
+        assert!(s.anomalies.iter().any(|a| a.ip == "10.0.0.3"));
+        assert!(!s.anomalies.iter().any(|a| a.ip == "10.0.0.1"));
     }
 }

@@ -33,7 +33,7 @@ pub fn fnum(v: Option<u64>) -> String {
 /// Serialize a probe row to its canonical CSV line.
 pub fn emit_probe_row(r: &ProbeRow) -> String {
     format!(
-        "{}{},{},{},{},{},{},{},{},{},{}",
+        "{}{},{},{},{},{},{},{},{},{},{},{}",
         PROBE_PREFIX,
         r.target,
         r.dns_ip,
@@ -47,6 +47,7 @@ pub fn emit_probe_row(r: &ProbeRow) -> String {
         r.icmp,
         fnum(r.icmp_ms),
         if r.partial { 1 } else { 0 },
+        r.ts,
     )
 }
 
@@ -62,12 +63,14 @@ pub fn parse_probe_line(line: &str, server_ip: &str, server_label: &str) -> Opti
     // Accept both formats for backward compatibility with older agents:
     //   10 fields: target,dns_ip,dns_ms,https_code,https_ms,tcp,tcp_ms,icmp,icmp_ms
     //   11 fields: ... + trailing `partial` (newer agents, via emit_probe_row)
+    //   12 fields: ... + trailing `partial`,`ts` (newest agents, time window)
     // Reject anything shorter than 10 or lines whose 2nd field isn't a target name.
     if f.len() < 10 || !f[1].chars().next().is_some_and(|c| c.is_alphabetic()) {
         return None;
     }
     let parse_u = |s: &str| s.parse::<u64>().ok();
     let partial = f.get(10).map(|v| *v == "1").unwrap_or(false);
+    let ts = f.get(11).and_then(|v| parse_u(v)).unwrap_or(0);
     let row = ProbeRow {
         server: server_ip.to_string(),
         label: server_label.to_string(),
@@ -86,6 +89,7 @@ pub fn parse_probe_line(line: &str, server_ip: &str, server_label: &str) -> Opti
             .iter()
             .any(|v| v.parse::<u64>().map(|n| n >= 60_000).unwrap_or(false)),
         partial,
+        ts,
     };
     Some(row)
 }
@@ -109,6 +113,7 @@ mod tests {
             icmp_ms: Some(20),
             sane: true,
             partial: false,
+            ts: 1753000000,
         }
     }
 
