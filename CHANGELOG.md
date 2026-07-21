@@ -5,6 +5,36 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-07-22
+
+### Added
+
+- **Probe format:** `ProbeRow`/`emit_probe_row`/`parse_probe_line` gain a
+  trailing `ts` (unix seconds) field recording when each measurement was
+  taken. Older 10/11-field probe lines without it still parse (`ts` defaults
+  to `0`).
+- **Aggregate:** `summarize()` now windows anomalies to the last hour —
+  rows with a `ts` older than 3600s are skipped, so the Anomalies count and
+  timeline/geo section reflect recent measurements instead of the entire
+  accumulated `probe.log`. Rows with `ts == 0` (pre-rollout agents) are still
+  counted, so the report stays correct while agents are upgraded.
+- `scripts/collect-and-report.sh` documented in the Quick start as the
+  one-shot way to pull logs from all servers and generate a report.
+
+### Fixed
+
+- `load_probe_logs`: a `file_type()` symlink check that failed open the
+  wrong way (`unwrap_or(true)`) was skipping every real log file on
+  filesystems where `file_type()` can error (e.g. btrfs), producing empty
+  reports. Now defaults to "not a symlink" (`unwrap_or(false)`) instead.
+- `parse_probe_line` now also accepts the newer 12-field format (with
+  trailing `partial,ts`) in addition to the existing 10/11-field formats.
+- **Security:** `list-servers` was briefly printing the SSH private-key path
+  in plaintext instead of `<redacted>` (accidental regression from the
+  `load_probe_logs` fix above); redaction restored.
+- Silenced a `dead_code` warning on `logfmt::PROBE_FIELDS` that made
+  `cargo clippy -D warnings` fail CI on `main`.
+
 ## [0.3.0] - 2026-07-19
 
 ### Added
