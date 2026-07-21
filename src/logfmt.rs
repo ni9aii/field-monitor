@@ -20,6 +20,7 @@ pub const PROBE_IP_PREFIX: &str = "PROBE_IP=";
 
 /// Number of CSV fields in a probe line (excluding the literal `target,`
 /// label at `f[0]`).
+#[allow(dead_code)]
 pub const PROBE_FIELDS: usize = 10;
 
 /// Format `Some(n)` / `None` as the integer string or `-` placeholder.
