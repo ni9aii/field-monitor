@@ -7,6 +7,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::logfmt;
 use crate::model::*;
 
+/// HTTPS latency above this (ms) is flagged HIGH_LATENCY / SLOW.
+const HTTPS_HIGH_LATENCY_MS: u64 = 800;
+/// DNS latency above this (ms) is flagged as an anomaly.
+const DNS_HIGH_LATENCY_MS: u64 = 2000;
+
 /// Parse an `AUDIT:`-prefixed line from the audit log.
 /// Returns None if the line lacks 11 pipe-delimited fields.
 /// The final field (`ports`) may itself contain `|`, so we split into at most
@@ -55,8 +60,8 @@ pub fn summarize(rows: Vec<ProbeRow>) -> Summary {
         }
         let bad = r.sane
             && (r.https_code.is_some_and(|c| c != 200)
-                || r.https_ms.is_some_and(|m| m > 2000)
-                || r.dns_ms.is_some_and(|m| m > 2000)
+                || r.https_ms.is_some_and(|m| m > HTTPS_HIGH_LATENCY_MS)
+                || r.dns_ms.is_some_and(|m| m > DNS_HIGH_LATENCY_MS)
                 || (r.tcp != "open" && r.tcp != "-" && !r.tcp.is_empty()));
         if bad {
             anomalies.push(Anomaly {
@@ -237,7 +242,7 @@ pub fn generate_markdown_report(s: &Summary, out_path: &Path) -> std::io::Result
                 // Status: distinguish a real success from "could not measure".
                 let status = if r.tcp == "closed" {
                     "BLOCKED"
-                } else if r.https_ms.map(|m| m > 2000).unwrap_or(false) {
+                } else if r.https_ms.map(|m| m > HTTPS_HIGH_LATENCY_MS).unwrap_or(false) {
                     "SLOW"
                 } else if r.https_code == Some(200) || r.tcp == "open" || r.icmp == "ok" {
                     "OK"
