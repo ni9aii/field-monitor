@@ -11,7 +11,21 @@
 #
 # Edit the variables below (placeholders, not real infrastructure) before use.
 #
-set -u
+# Real vantage-point IPs are loaded from $HOME/.config/field-monitor/
+# vantage-points.env (git-ignored, private) if present. Create that file with:
+#   VP01_IP=1.2.3.4
+#   VP02_IP=5.6.7.8
+#   ... (one per host, matching the order in HOSTS below)
+# If the file is missing, the script reports all hosts as unreachable (-1)
+# instead of crashing.
+#
+set -o pipefail
+
+CONFIG="${VANTAGE_POINTS_ENV:-$HOME/.config/field-monitor/vantage-points.env}"
+if [ -f "$CONFIG" ]; then
+  # shellcheck disable=SC1090
+  source "$CONFIG"
+fi
 
 DEPLOY_USER="your-user"            # SSH user on the vantage points
 KEY_DIRECT="$HOME/.ssh/id_ed25519" # key for direct + relay hops
@@ -77,7 +91,11 @@ problems=()
 
 for entry in "${HOSTS[@]}"; do
   read -r ip name key relay <<<"$entry"
-  c=$(apple_family_count "$ip" "$key" "$relay")
+  if [ -z "$ip" ]; then
+    c=-1
+  else
+    c=$(apple_family_count "$ip" "$key" "$relay")
+  fi
   counts+=("$name=$c")
   if [ "$c" -le 0 ]; then
     problems+=("$name ($ip) apple_family_count=$c")
