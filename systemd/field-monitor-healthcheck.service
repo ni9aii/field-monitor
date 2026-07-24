@@ -1,0 +1,10 @@
+[Unit]
+Description=field-monitor healthcheck (apple-family reachability across 12 vantage points)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /home/ni9aii/.hermes/scripts/field-monitor-healthcheck.py
+# script writes its own history to ~/.local/share/field-monitor/healthcheck.log
+# and prints a short report to stdout (captured by journald)
