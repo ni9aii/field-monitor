@@ -91,6 +91,12 @@ jobs:
             --geo-notes "n/a" --current-state "n/a" \
             --raw-blocked "x" --raw-ok "y" --raw-tail "z" \
             --template templates/apple-report-template.md | grep -q '{{' && { echo "ERROR: unfilled placeholder"; exit 1; } || echo "gen-report OK (no placeholders left)"
+      - name: Shell syntax check (bash scripts)
+        run: |
+          for f in scripts/*.sh; do
+            bash -n "$f" || { echo "SYNTAX ERROR in $f"; exit 1; }
+          done
+          echo "all scripts OK"
 
   build:
     name: build (${{ matrix.os }} ${{ matrix.target }})
