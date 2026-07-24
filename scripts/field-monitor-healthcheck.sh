@@ -86,7 +86,7 @@ run_remote() {
 apple_family_count() {
   local ip="$1" key="$2" relay="${3:-}"
   local names="$APPLE_NAMES"
-  local cmd="c=0; for n in $names; do c=\$((c+\$(grep -c \"target,\$n,\" $RESULTS_DIR/probe.log))); done; echo \$c"
+  local cmd="c=0; for n in $names; do c=\$((c+\$(grep -c \"target,\$n,\" \$HOME/.local/share/field-monitor/probe.log))); done; echo \$c"
   local out
   out=$(run_remote "$ip" "$key" "$cmd" "$relay" 2>/dev/null)
   local last
