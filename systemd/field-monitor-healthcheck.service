@@ -5,6 +5,6 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/python3 %h/.hermes/scripts/field-monitor-healthcheck.py
+ExecStart=/bin/bash %h/code/field-monitor/scripts/field-monitor-healthcheck.sh
 # script writes its own history to ~/.local/share/field-monitor/healthcheck.log
 # and prints a short report to stdout (captured by journald)
