@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# deploy.sh — build field-monitor v0.4.0 and roll it out to all 12 vantage points.
+# deploy.sh — build field-monitor and roll it out to all vantage points.
 #
 # What it does (idempotent, safe to re-run):
-#   1. cargo build --release (x86_64) from ../field-monitor
+#   1. cargo build --release (x86_64) from the source tree
 #   2. cargo build --release for aarch64 (cross, if needed) — linker
 #      aarch64-linux-gnu-gcc, configured via .cargo/config.toml in the source tree
 #   3. for each host: upload binary + targets.toml (cat-pipe over ssh, because
@@ -12,41 +12,49 @@
 #      and restart the timer (timers hang after daemon-reload — must restart).
 #
 # Prereqs:
-#   - ../field-monitor checked out at commit 1183b0b (v0.4.0)
-#   - ssh keys available: KEY_A for direct+relay hops, KEY_B for PERM-home
-#   - local targets.toml (git-ignored) with the 14-target allowlist; an example
+#   - field-monitor source checked out (see $SRC below)
+#   - SSH keys available: $KEY_DIRECT for direct+relay hops, $KEY_RELAY for
+#     the ARM64 host (if any)
+#   - local targets.toml (git-ignored) with the target allowlist; an example
 #     is provided as targets.toml.example
+#
+# EDIT THE VARIABLES BELOW before running — they are placeholders, not real
+# infrastructure. No real IPs, hostnames, or usernames are committed to the
+# repo.
 #
 # Host map: "ip name key relay" — relay empty for direct hosts.
 #
 set -u
 
-KEY_A="$HOME/.ssh/id_ed25519_a"
-KEY_B="$HOME/.ssh/id_ed25519_b"
-SRC="$HOME/code/field-monitor"
+# ─── Fill these in for YOUR deployment (do NOT commit real values) ──────────
+DEPLOY_USER="your-user"                 # SSH user on the vantage points
+KEY_DIRECT="$HOME/.ssh/id_ed25519"      # key for direct + relay hops
+KEY_RELAY="$HOME/.ssh/id_ed25519"        # key for the ARM64 host (if any)
+SRC="$HOME/code/field-monitor"           # path to the source tree
 TARGETS="${TARGETS_TOML:-$HOME/.config/field-monitor/targets.toml}"
 
-# ip  name  key  relay(ip or empty)
+# ip            name    key           relay(ip or empty)
 HOSTS=(
-  "178.72.170.27 SPB2          $KEY_A ''"
-  "2.59.41.170   SPB           $KEY_A 178.72.170.27"
-  "194.87.210.7  SPB-ruvds     $KEY_A ''"
-  "185.173.176.89 EKB          $KEY_A 85.208.208.113"
-  "85.208.208.113 EKB-ruvds    $KEY_A ''"
-  "45.143.138.48 MOW-vladimir  $KEY_A 178.72.170.27"
-  "5.182.27.43   OMSK          $KEY_A ''"
-  "46.17.248.172 KZN-ruvds     $KEY_A ''"
-  "195.133.198.80 NSK-ruvds    $KEY_A ''"
-  "193.238.134.134 VVO-ruvds   $KEY_A ''"
-  "185.184.128.1 MOW-bm-server $KEY_A ''"
-  "62.16.40.82   PERM-home     $KEY_B ''"
+  "$VP01_IP vp-01 $KEY_DIRECT ''"
+  "$VP02_IP vp-02 $KEY_DIRECT $VP01_IP"
+  "$VP03_IP vp-03 $KEY_DIRECT ''"
+  "$VP04_IP vp-04 $KEY_DIRECT $VP03_IP"
+  "$VP05_IP vp-05 $KEY_DIRECT ''"
+  "$VP06_IP vp-06 $KEY_DIRECT $VP01_IP"
+  "$VP07_IP vp-07 $KEY_DIRECT ''"
+  "$VP08_IP vp-08 $KEY_DIRECT ''"
+  "$VP09_IP vp-09 $KEY_DIRECT ''"
+  "$VP10_IP vp-10 $KEY_DIRECT ''"
+  "$VP11_IP vp-11 $KEY_DIRECT $VP01_IP"
+  "$VP12_IP vp-12 $KEY_RELAY   ''"
 )
+# ─────────────────────────────────────────────────────────────────────────────
 
 echo "==> building x86_64 release"
 ( cd "$SRC" && cargo build --release ) || { echo "x86_64 build failed"; exit 1; }
 BIN_X86="$SRC/target/release/field-monitor"
 
-# aarch64 only if PERM-home is in the map (it is); build once
+# aarch64 only if an ARM64 host is in the map; build once
 echo "==> building aarch64 release (cross)"
 ( cd "$SRC" && cargo build --release --target aarch64-unknown-linux-gnu ) || { echo "aarch64 build failed"; exit 1; }
 BIN_ARM="$SRC/target/aarch64-unknown-linux-gnu/release/field-monitor"
@@ -56,35 +64,35 @@ BIN_ARM="$SRC/target/aarch64-unknown-linux-gnu/release/field-monitor"
 ssh_base() {
   # $1=ip $2=key $3=relay
   if [ -n "$3" ]; then
-    echo "ssh -F /dev/null -i $2 -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 ni9aii@$3 ssh -i $2 -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 ni9aii@$1"
+    echo "ssh -F /dev/null -i $2 -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 $DEPLOY_USER@$3 ssh -i $2 -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 $DEPLOY_USER@$1"
   else
-    echo "ssh -F /dev/null -i $2 -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8 ni9aii@$1"
+    echo "ssh -F /dev/null -i $2 -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8 $DEPLOY_USER@$1"
   fi
 }
 
 for entry in "${HOSTS[@]}"; do
   read -r ip name key relay <<<"$entry"
-  bin="$BIN_X86"; [ "$name" = "PERM-home" ] && bin="$BIN_ARM"
+  bin="$BIN_X86"; [ "$name" = "vp-12" ] && bin="$BIN_ARM"
 
   echo "==> $name ($ip)"
 
   # upload binary via cat-pipe (works through relays; plain scp inside nested ssh does not)
   if [ -n "$relay" ]; then
-    ssh -F /dev/null -i "$key" -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 "ni9aii@$relay" \
-      "ssh -i $key -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 ni9aii@$ip 'cat > ~/.local/bin/field-monitor'" < "$bin" \
+    ssh -F /dev/null -i "$key" -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 "$DEPLOY_USER@$relay" \
+      "ssh -i $key -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 $DEPLOY_USER@$ip 'cat > ~/.local/bin/field-monitor'" < "$bin" \
       && echo "    binary uploaded (relay)"
   else
-    cat "$bin" | ssh -F /dev/null -i "$key" -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8 "ni9aii@$ip" 'cat > ~/.local/bin/field-monitor' \
+    cat "$bin" | ssh -F /dev/null -i "$key" -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8 "$DEPLOY_USER@$ip" 'cat > ~/.local/bin/field-monitor' \
       && echo "    binary uploaded"
   fi
 
   # upload targets.toml
   if [ -n "$relay" ]; then
-    ssh -F /dev/null -i "$key" -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 "ni9aii@$relay" \
-      "ssh -i $key -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 ni9aii@$ip 'cat > ~/targets.toml'" < "$TARGETS" \
+    ssh -F /dev/null -i "$key" -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 "$DEPLOY_USER@$relay" \
+      "ssh -i $key -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 $DEPLOY_USER@$ip 'cat > ~/targets.toml'" < "$TARGETS" \
       && echo "    targets.toml uploaded (relay)"
   else
-    cat "$TARGETS" | ssh -F /dev/null -i "$key" -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8 "ni9aii@$ip" 'cat > ~/targets.toml' \
+    cat "$TARGETS" | ssh -F /dev/null -i "$key" -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8 "$DEPLOY_USER@$ip" 'cat > ~/targets.toml' \
       && echo "    targets.toml uploaded"
   fi
 
@@ -106,18 +114,18 @@ StandardError=append:%h/.local/share/field-monitor/probe.log
 WantedBy=multi-user.target"
 
   if [ -n "$relay" ]; then
-    ssh -F /dev/null -i "$key" -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 "ni9aii@$relay" \
-      "ssh -i $key -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 ni9aii@$ip 'cat > ~/.config/systemd/user/field-monitor-probe.service'" <<<"$unit"
+    ssh -F /dev/null -i "$key" -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 "$DEPLOY_USER@$relay" \
+      "ssh -i $key -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 $DEPLOY_USER@$ip 'cat > ~/.config/systemd/user/field-monitor-probe.service'" <<<"$unit"
   else
-    ssh -F /dev/null -i "$key" -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8 "ni9aii@$ip" 'cat > ~/.config/systemd/user/field-monitor-probe.service' <<<"$unit"
+    ssh -F /dev/null -i "$key" -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8 "$DEPLOY_USER@$ip" 'cat > ~/.config/systemd/user/field-monitor-probe.service' <<<"$unit"
   fi
 
   inner="systemctl --user daemon-reload && systemctl --user restart field-monitor-probe.timer"
   if [ -n "$relay" ]; then
-    ssh -F /dev/null -i "$key" -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 "ni9aii@$relay" \
-      "ssh -i $key -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 ni9aii@$ip '$inner'" >/dev/null 2>&1
+    ssh -F /dev/null -i "$key" -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 "$DEPLOY_USER@$relay" \
+      "ssh -i $key -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 $DEPLOY_USER@$ip '$inner'" >/dev/null 2>&1
   else
-    ssh -F /dev/null -i "$key" -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8 "ni9aii@$ip" "$inner" >/dev/null 2>&1
+    ssh -F /dev/null -i "$key" -p 9922 -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8 "$DEPLOY_USER@$ip" "$inner" >/dev/null 2>&1
   fi
   echo "    unit rewritten, daemon-reload + timer restart done"
 done
