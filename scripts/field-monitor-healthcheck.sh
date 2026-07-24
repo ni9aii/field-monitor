@@ -21,34 +21,46 @@
 #
 set -o pipefail
 
+DEPLOY_USER="your-user"            # SSH user on the vantage points (override in vantage-points.env)
+KEY_A="$HOME/.ssh/id_ed25519"      # key for direct + relay hops (override in vantage-points.env)
+KEY_B="$HOME/.ssh/id_ed25519"      # key for the ARM64 host (if any) (override in vantage-points.env)
+SSH_PORT=9922
+
+# Real vantage-point IPs + key overrides are loaded from
+# $HOME/.config/field-monitor/vantage-points.env (git-ignored, private) if
+# present. The file may redefine DEPLOY_USER / KEY_A / KEY_B / VP0N_IP.
+# Create it with:
+#   VP01_IP=1.2.3.4
+#   VP02_IP=5.6.7.8
+#   ... (one per host, matching the order in HOSTS below)
+#   KEY_A=/home/you/.ssh/real_key_a
+#   KEY_B=/home/you/.ssh/real_key_b
+#   DEPLOY_USER=your-ssh-user
+# If the file is missing, the script reports all hosts as unreachable (-1)
+# instead of crashing.
 CONFIG="${VANTAGE_POINTS_ENV:-$HOME/.config/field-monitor/vantage-points.env}"
 if [ -f "$CONFIG" ]; then
   # shellcheck disable=SC1090
   source "$CONFIG"
 fi
 
-DEPLOY_USER="your-user"            # SSH user on the vantage points
-KEY_DIRECT="$HOME/.ssh/id_ed25519" # key for direct + relay hops
-KEY_RELAY="$HOME/.ssh/id_ed25519"  # key for the ARM64 host (if any)
-SSH_PORT=9922
-
 RESULTS_DIR="${RESULTS_DIR:-$HOME/.local/share/field-monitor}"
 LOG="$RESULTS_DIR/healthcheck.log"
 
 # ip name key relay(ip or empty) — fill VP0N_IP with your real IPs (never commit)
 HOSTS=(
-  "$VP01_IP vp-01 $KEY_DIRECT ''"
-  "$VP02_IP vp-02 $KEY_DIRECT $VP01_IP"
-  "$VP03_IP vp-03 $KEY_DIRECT ''"
-  "$VP04_IP vp-04 $KEY_DIRECT $VP03_IP"
-  "$VP05_IP vp-05 $KEY_DIRECT ''"
-  "$VP06_IP vp-06 $KEY_DIRECT $VP01_IP"
-  "$VP07_IP vp-07 $KEY_DIRECT ''"
-  "$VP08_IP vp-08 $KEY_DIRECT ''"
-  "$VP09_IP vp-09 $KEY_DIRECT ''"
-  "$VP10_IP vp-10 $KEY_DIRECT ''"
-  "$VP11_IP vp-11 $KEY_DIRECT $VP01_IP"
-  "$VP12_IP vp-12 $KEY_RELAY   ''"
+  "$VP01_IP vp-01 $KEY_A ''"
+  "$VP02_IP vp-02 $KEY_A $VP01_IP"
+  "$VP03_IP vp-03 $KEY_A ''"
+  "$VP04_IP vp-04 $KEY_A $VP03_IP"
+  "$VP05_IP vp-05 $KEY_A ''"
+  "$VP06_IP vp-06 $KEY_A $VP01_IP"
+  "$VP07_IP vp-07 $KEY_A ''"
+  "$VP08_IP vp-08 $KEY_A ''"
+  "$VP09_IP vp-09 $KEY_A ''"
+  "$VP10_IP vp-10 $KEY_A ''"
+  "$VP11_IP vp-11 $KEY_A $VP01_IP"
+  "$VP12_IP vp-12 $KEY_B   ''"
 )
 
 APPLE_NAMES="apple appleid apps music mesu support developer itunes books icloud"
