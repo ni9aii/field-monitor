@@ -1,0 +1,3 @@
+Example open question one — what remains unresolved.
+Example open question two — what requires further diagnosis.
+Example open question three — data gaps to fill.

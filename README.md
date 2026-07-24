@@ -63,6 +63,40 @@ FIELD_MONITOR_MD=/path/to/report.md ./target/release/field-monitor aggregate
 ./scripts/collect-and-report.sh
 ```
 
+## Report generator
+
+`gen-report` (standalone binary, built alongside `field-monitor`) fills
+`templates/apple-report-template.md` from CSV dumps produced by the
+`extract` step, producing a ready-to-publish markdown report.
+
+```bash
+cargo build --release
+./target/release/gen-report \
+  --snapshots apple-availability-YYYY_MM_DD_DD_snapshots.csv \
+  --anomalies apple-availability-YYYY_MM_DD_DD_anomalies.csv \
+  --title "Report title" \
+  --created 2026-07-24 \
+  --heading "Report heading" \
+  --current-ts "23.07 23:09Z" \
+  --empty-reason "optional reason for empty hours" \
+  --facts templates/examples/22-23-facts.txt \
+  --open-questions templates/examples/22-23-open-questions.txt \
+  --geo-notes "geography notes" \
+  --current-state "current state" \
+  --raw-blocked "| EXAMPLE | host | github | Some(0) | Some(8000) | open | HTTPS_FAIL |" \
+  --raw-ok "| apple | 203.0.113.5 | 200 | 132 ms | 30 ms | open | - | OK |" \
+  --raw-tail "(fill from probe.log tail)" \
+  --template templates/apple-report-template.md \
+  > report.md
+```
+
+Arguments:
+- `--snapshots` / `--anomalies` — CSV from the extract step.
+- `--facts` / `--open-questions` — one item per line (numbered / checklist).
+- `--template` — path to the markdown template (default:
+  `templates/apple-report-template.md`).
+- All other flags fill corresponding `{{PLACEHOLDER}}` tokens in the template.
+
 For production deployment (systemd user-units, multi-server orchestration,
 aarch64 builds) see [docs/SETUP.md](docs/SETUP.md).
 For the full configuration reference see [docs/CONFIG.md](docs/CONFIG.md).
