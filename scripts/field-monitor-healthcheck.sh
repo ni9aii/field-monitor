@@ -72,12 +72,12 @@ run_remote() {
   local ip="$1" key="$2" inner="$3" relay="${4:-}"
   if [ -n "$relay" ]; then
     ssh -F /dev/null -i "$key" -p "$SSH_PORT" \
-      -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 \
+      -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=10 \
       "$DEPLOY_USER@$relay" \
-      "ssh -i $key -p $SSH_PORT -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 $DEPLOY_USER@$ip '$inner'"
+      "ssh -i $key -p $SSH_PORT -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=10 $DEPLOY_USER@$ip '$inner'"
   else
     ssh -F /dev/null -i "$key" -p "$SSH_PORT" \
-      -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8 \
+      -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=10 \
       "$DEPLOY_USER@$ip" "$inner"
   fi
 }
