@@ -101,6 +101,29 @@ For production deployment (systemd user-units, multi-server orchestration,
 aarch64 builds) see [docs/SETUP.md](docs/SETUP.md).
 For the full configuration reference see [docs/CONFIG.md](docs/CONFIG.md).
 
+## Health check
+
+`scripts/field-monitor-healthcheck.sh` verifies that all vantage points are
+still measuring the Apple service family (counts `target,apple*,` lines in
+each server's `probe.log`, compares with the previous run). It is
+read-only (ssh + grep), writes a history to `healthcheck.log`, and prints a
+short report.
+
+Real vantage-point IPs and SSH keys are loaded from
+`~/.config/field-monitor/vantage-points.env` (git-ignored, private) — see
+`vantage-points.example.env`. Edit that file; never commit real IPs/keys.
+
+Run it on a schedule:
+
+```bash
+# via Hermes cron (recommended — the agent has network access)
+#   Hermes cronjob every 30 min -> bash $HOME/code/field-monitor/scripts/field-monitor-healthcheck.sh
+
+# or via systemd user timer (optional; only if ssh from systemd reaches
+# your hosts — set Environment=HOME=%h in the unit, already done)
+#   systemctl --user enable --now field-monitor-healthcheck.timer
+```
+
 ## What it is not
 
 `field-monitor` is **not** a scanner, a circumvention tool, or a way to
