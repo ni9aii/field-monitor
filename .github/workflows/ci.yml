@@ -79,6 +79,18 @@ jobs:
           echo "--- probe (local measurement, needs FIELD_PROBE_IP) ---"
           FIELD_PROBE_IP=example.com ./target/release/field-monitor probe
           rm -f config.toml targets.toml
+      - name: Smoke-test gen-report (no private data)
+        run: |
+          ./target/release/gen-report \
+            --snapshots <(printf '2026-07-22,01,vp-01,apple,OK\n') \
+            --anomalies <(printf '2026-07-22,01,vp-01,apple,HTTPS_FAIL\n') \
+            --title "CI smoke" --created 2026-07-24 --heading "CI" \
+            --current-ts "01.01 00:00Z" --empty-reason "n/a" \
+            --facts <(printf 'fact one\n') \
+            --open-questions <(printf 'q one\n') \
+            --geo-notes "n/a" --current-state "n/a" \
+            --raw-blocked "x" --raw-ok "y" --raw-tail "z" \
+            --template templates/apple-report-template.md | grep -q '{{' && { echo "ERROR: unfilled placeholder"; exit 1; } || echo "gen-report OK (no placeholders left)"
 
   build:
     name: build (${{ matrix.os }} ${{ matrix.target }})
@@ -104,9 +116,9 @@ jobs:
         shell: bash
         run: |
           if [ -n "${{ matrix.target }}" ]; then
-            cargo build --release --target "${{ matrix.target }}"
+            cargo build --release --bins --target "${{ matrix.target }}"
           else
-            cargo build --release
+            cargo build --release --bins
           fi
 
   # Native aarch64 build inside a Debian bookworm container (the same as on

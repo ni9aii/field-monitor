@@ -80,7 +80,10 @@ fn server_table() -> String {
     ];
     let mut out = String::new();
     for (label, region, dc) in rows {
-        out.push_str(&format!("| {} | {} | {} | [REDACTED] |\n", label, region, dc));
+        out.push_str(&format!(
+            "| {} | {} | {} | [REDACTED] |\n",
+            label, region, dc
+        ));
     }
     out
 }
@@ -101,13 +104,9 @@ fn build_timeline(snap_rows: &[Vec<String>]) -> String {
         let target = &r[3];
         let status = r.get(4).map(|s| s.as_str()).unwrap_or("");
         let key = (day.clone(), hour.clone());
-        let e = agg.entry(key).or_insert_with(|| {
-            (
-                std::collections::HashSet::new(),
-                0_usize,
-                0_usize,
-            )
-        });
+        let e = agg
+            .entry(key)
+            .or_insert_with(|| (std::collections::HashSet::new(), 0_usize, 0_usize));
         e.0.insert(server.clone());
         if target == "apple" && status == "OK" {
             e.1 += 1;
@@ -116,9 +115,8 @@ fn build_timeline(snap_rows: &[Vec<String>]) -> String {
             e.2 += 1;
         }
     }
-    let mut lines = String::from(
-        "| Generated (UTC) | vps | apple OK | icloud OK | Статус / интерпретация |\n",
-    );
+    let mut lines =
+        String::from("| Generated (UTC) | vps | apple OK | icloud OK | Статус / интерпретация |\n");
     lines.push_str("|-----------------|----:|---------:|----------:|------------------------|\n");
     for ((day, hour), (servers, apple_ok, icloud_ok)) in &agg {
         let vps = servers.len();
@@ -196,8 +194,14 @@ fn main() {
 
     let snapshots = read_lines(&get("snapshots"));
     let anomalies = read_lines(&get("anomalies"));
-    let snap_rows: Vec<Vec<String>> = snapshots.iter().map(|l| l.split(',').map(String::from).collect()).collect();
-    let anom_rows: Vec<Vec<String>> = anomalies.iter().map(|l| l.split(',').map(String::from).collect()).collect();
+    let snap_rows: Vec<Vec<String>> = snapshots
+        .iter()
+        .map(|l| l.split(',').map(String::from).collect())
+        .collect();
+    let anom_rows: Vec<Vec<String>> = anomalies
+        .iter()
+        .map(|l| l.split(',').map(String::from).collect())
+        .collect();
 
     let facts_lines = read_lines(&get("facts"));
     let facts = if facts_lines.is_empty() {
