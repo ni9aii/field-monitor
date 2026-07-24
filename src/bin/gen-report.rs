@@ -61,21 +61,22 @@ fn read_lines(path: &str) -> Vec<String> {
     }
 }
 
-/// Server/region/DC map (kept in sync with deploy.sh HOSTS). IPs redacted.
+/// Server/region/DC map (kept in sync with deploy.sh HOSTS).
+/// Abstract labels only — no real infrastructure names or IPs.
 fn server_table() -> String {
     let rows: &[(&str, &str, &str)] = &[
-        ("vp-ruvds-1", "Владивосток", "RUVDS"),
-        ("EKB", "Екатеринбург", "отдельный ДЦ"),
-        ("vp-ruvds-4", "Екатеринбург", "RUVDS"),
-        ("vp-ruvds-3", "Казань", "RUVDS"),
-        ("vp-mow-vladimir", "Москва", "отдельный ДЦ"),
-        ("bm-server", "Москва", "отдельный ДЦ"),
-        ("vp-ruvds-5", "Санкт-Петербург", "RUVDS"),
-        ("omsk.org", "Омск", "отдельный ДЦ"),
-        ("vp-perm-home", "Пермь", "отдельный ДЦ"),
-        ("SPB", "Санкт-Петербург", "отдельный ДЦ"),
-        ("vp-spb2-relay", "Санкт-Петербург", "тот же ДЦ, что SPB (relay)"),
-        ("vp-ruvds-2", "Новосибирск", "RUVDS"),
+        ("vp-01", "Регион-1", "ДЦ-A"),
+        ("vp-02", "Регион-2", "ДЦ-B"),
+        ("vp-03", "Регион-2", "ДЦ-A"),
+        ("vp-04", "Регион-3", "ДЦ-B"),
+        ("vp-05", "Регион-4", "ДЦ-A"),
+        ("vp-06", "Регион-4", "ДЦ-C"),
+        ("vp-07", "Регион-5", "ДЦ-A"),
+        ("vp-08", "Регион-6", "ДЦ-B"),
+        ("vp-09", "Регион-7", "ДЦ-A"),
+        ("vp-10", "Регион-5", "ДЦ-B"),
+        ("vp-11", "Регион-5", "ДЦ-B (relay)"),
+        ("vp-12", "Регион-8", "ДЦ-A"),
     ];
     let mut out = String::new();
     for (label, region, dc) in rows {
