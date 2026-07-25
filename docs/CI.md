@@ -20,9 +20,13 @@ Workflow: `.github/workflows/ci.yml`. Runs on every push and PR.
 `.github/workflows/audit.yml` runs the free `cargo audit` CLI (RUSTSEC
 database) on every push, PR, and daily schedule. It needs **no third-party
 service account** — only the built-in `GITHUB_TOKEN`. Known advisories fail
-the job; GitHub's Dependabot security updates (enabled on the repo) turn
-those advisories into fix PRs automatically. This replaced the previous Snyk
-workflow, which required a Snyk org/token and never opened PRs in this repo.
+the job; the fix PR is then opened by **Renovate** (the project's dependency
+bot — see `renovate.json`). This replaced the previous Snyk workflow, which
+required a Snyk org/token and never opened PRs in this repo.
+
+> **Note:** GitHub Dependabot is intentionally disabled in this repo
+> (`.github/dependabot.yml` removed) to avoid duplicate update PRs — Renovate
+> is the single source of dependency updates across all owner repositories.
 
 ### Why a native aarch64 container
 
