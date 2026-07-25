@@ -5,8 +5,13 @@ cd "$(dirname "$0")/.."
 export RESULTS_DIR="${RESULTS_DIR:-$HOME/.local/share/field-monitor}"
 mkdir -p "$RESULTS_DIR"
 
-# Clean old logs before collecting fresh ones
-rm -f "$RESULTS_DIR"/*.log
+# Clean old per-server logs before collecting fresh ones. Excludes
+# report.log: when this script runs under field-monitor-report.service,
+# systemd redirects this very process's stdout/stderr there, so a bare
+# *.log glob would unlink the file this process is actively writing to
+# (the data survives until exit via the open fd, then vanishes with it —
+# report.log never persists).
+find "$RESULTS_DIR" -maxdepth 1 -name '*.log' ! -name 'report.log' -delete
 
 BIN=target/release/field-monitor
 echo "=== collect ($(date -u +%Y-%m-%dT%H:%M:%SZ)) ==="
