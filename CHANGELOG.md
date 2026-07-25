@@ -5,6 +5,42 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Deploy/collect scripts:** `list-servers` deliberately redacts the SSH
+  key path (security hardening, see 0.4.0 below), but `deploy.sh`/
+  `collect.sh` were still reading the key from that redacted output and
+  passing the literal `<redacted>` to `ssh`/`scp -i`, breaking deployment.
+  Both scripts now resolve the real key path locally from `config.toml`.
+- **Deploy:** `field-monitor-report.timer`/`.service` were being pushed to
+  every probed server, not just the orchestrator. `collect-and-report.sh`
+  only makes sense on the machine holding the repo checkout that pulls logs
+  from the fleet; removed from the per-server unit list in `deploy.sh`.
+- **Deploy:** `field-monitor-probe.service` never set
+  `FIELD_MONITOR_CONFIG`/`FIELD_MONITOR_TARGETS`, so the deployed
+  `~/.config/field-monitor.toml` was never read on the remote host and
+  probes silently measured zero targets. Added the env vars to the unit;
+  `deploy.sh` now also ships `targets.toml` to each server.
+- **Probe:** `tcp_check` only tried the first address a hostname resolved
+  to. Anycast/CDN targets (e.g. Google, Apple, GitHub) commonly resolve to
+  several IPs, and one being unreachable from a given vantage point doesn't
+  mean the target is down — this produced rows where HTTPS succeeded but
+  TCP:443 falsely read `closed` on the same row. Now tries up to 6 resolved
+  addresses before reporting `closed`, matching the multi-address fallback
+  `curl` already does for the HTTPS check.
+- **Aggregate:** any HTTP response (redirects, auth-walls, etc.) now counts
+  as reachable — only `https_code == 0` (curl couldn't connect at all /
+  timed out) is a failure. Previously any non-200 status was flagged
+  `HTTPS_FAIL`, which drowned real anomalies in noise for targets that
+  legitimately redirect or gate on auth.
+
+### Changed
+
+- HTTPS `HIGH_LATENCY`/`SLOW` threshold lowered from 2000ms to 800ms
+  (`HTTPS_HIGH_LATENCY_MS`); the DNS latency threshold (2000ms) is unchanged.
+
 ## [0.4.0] - 2026-07-22
 
 ### Added
