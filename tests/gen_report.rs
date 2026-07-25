@@ -124,3 +124,85 @@ fn fills_all_placeholders_and_produces_report() {
     let _ = fs::remove_file(&facts);
     let _ = fs::remove_file(&oq);
 }
+
+#[test]
+fn emits_per_region_and_geo_sections() {
+    // PR #14 added a per-region/DC topology table (from REGION_DC) and a
+    // {{GEO_NOTES}} substitution. Verify both appear and the placeholder is
+    // replaced (no leftover {{...}}).
+    let bin = ensure_binary();
+    let template = repo_root().join("templates/apple-report-template.md");
+    assert!(template.exists(), "template missing");
+
+    let snap = write_tmp(
+        "gen_report_geo_snap.csv",
+        "2026-07-22,01,vp-01,apple,OK\n2026-07-22,01,vp-08,apple,OK\n",
+    );
+    let anom = write_tmp("gen_report_geo_anom.csv", "");
+    let facts = write_tmp("gen_report_geo_facts.txt", "geo fact\n");
+    let oq = write_tmp("gen_report_geo_oq.txt", "geo question\n");
+
+    let out = Command::new(&bin)
+        .args([
+            "--snapshots",
+            snap.to_str().unwrap(),
+            "--anomalies",
+            anom.to_str().unwrap(),
+            "--title",
+            "Geo Report",
+            "--created",
+            "2026-07-24",
+            "--heading",
+            "Geo Heading",
+            "--current-ts",
+            "01.01 00:00Z",
+            "--empty-reason",
+            "geo empty",
+            "--facts",
+            facts.to_str().unwrap(),
+            "--open-questions",
+            oq.to_str().unwrap(),
+            "--geo-notes",
+            "GEO_NOTES_SUBSTITUTED",
+            "--current-state",
+            "geo state",
+            "--raw-blocked",
+            "| EXAMPLE | host | github | Some(0) | Some(8000) | open | HTTPS_FAIL |",
+            "--raw-ok",
+            "| apple | 203.0.113.5 | 200 | 132 ms | 30 ms | open | - | OK |",
+            "--raw-tail",
+            "(tail)",
+            "--template",
+            template.to_str().unwrap(),
+        ])
+        .output()
+        .expect("failed to run gen-report");
+
+    assert!(out.status.success(), "gen-report exited non-zero");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+
+    assert!(
+        !stdout.contains("{{"),
+        "unfilled placeholder left in output:\n{}",
+        stdout
+    );
+    // Per-region/DC topology table from REGION_DC must be present.
+    assert!(stdout.contains("Регион-1"), "region-1 row missing");
+    assert!(stdout.contains("Регион-8"), "region-8 row missing");
+    assert!(stdout.contains("ДЦ-A"), "DC-A missing");
+    assert!(stdout.contains("ДЦ-C"), "DC-C missing");
+    // {{GEO_NOTES}} substituted.
+    assert!(
+        stdout.contains("GEO_NOTES_SUBSTITUTED"),
+        "geo-notes not substituted"
+    );
+    assert!(
+        !stdout.contains("{{GEO_NOTES}}"),
+        "geo-notes placeholder left unfilled"
+    );
+
+    let _ = fs::remove_file(&snap);
+    let _ = fs::remove_file(&anom);
+    let _ = fs::remove_file(&facts);
+    let _ = fs::remove_file(&oq);
+}

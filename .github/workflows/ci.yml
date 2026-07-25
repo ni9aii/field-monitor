@@ -91,12 +91,19 @@ jobs:
             --geo-notes "n/a" --current-state "n/a" \
             --raw-blocked "x" --raw-ok "y" --raw-tail "z" \
             --template templates/apple-report-template.md | grep -q '{{' && { echo "ERROR: unfilled placeholder"; exit 1; } || echo "gen-report OK (no placeholders left)"
-      - name: Shell syntax check (bash scripts)
+      - name: Shell syntax + lint + functional tests (bash scripts)
         run: |
+          # Install shellcheck for static analysis of the deploy/healthcheck scripts.
+          sudo apt-get update && sudo apt-get install -y shellcheck
           for f in scripts/*.sh; do
             bash -n "$f" || { echo "SYNTAX ERROR in $f"; exit 1; }
+            shellcheck -S warning "$f" || { echo "SHELLCHECK ERROR in $f"; exit 1; }
           done
-          echo "all scripts OK"
+          echo "all scripts: syntax + shellcheck OK"
+          # Functional integration tests for the new bash scripts (mocked ssh/cargo).
+          chmod +x tests/deploy-vantage.sh tests/field-monitor-healthcheck.sh
+          ./tests/deploy-vantage.sh
+          ./tests/field-monitor-healthcheck.sh
 
   build:
     name: build (${{ matrix.os }} ${{ matrix.target }})
