@@ -134,18 +134,36 @@ fn https_check(url: &str, runner: &dyn CommandRunner) -> Option<(u16, u64)> {
     Some((code, t1.saturating_sub(t0)))
 }
 
+/// Max resolved addresses to try per TCP check (bounds worst-case wall time;
+/// CDN/anycast hosts can return many A/AAAA records). Each gets the full
+/// configured timeout — probes run hourly, so an occasional slow-but-real
+/// connection taking the full budget on 2-3 addresses is fine; splitting the
+/// budget across addresses instead cut off legitimately slow (2-7s) real
+/// connections and reintroduced false "closed" results.
+const TCP_MAX_ADDRS: usize = 6;
+
 /// TCP check via native Rust socket (no python3 subprocess → no command
 /// injection via the `host` value). Returns (state, ms).
+///
+/// Tries multiple addresses the resolver returns, not just the first — CDN /
+/// anycast hosts (Google, Apple, GitHub, ...) commonly resolve to several
+/// IPs, and one being unreachable from this vantage point does not mean the
+/// target is down (the HTTPS check via `curl` already falls back across
+/// addresses the same way; this must match, or "TCP closed" would falsely
+/// contradict a successful HTTPS check on the same row). Capped to
+/// `TCP_MAX_ADDRS` addresses so a target with many dead addresses can't
+/// stretch a single check indefinitely.
 fn tcp_check(host: &str, port: u16) -> (String, Option<u64>) {
     let t0 = now_ms();
     let timeout = Duration::from_secs(tcp_timeout().parse::<u64>().unwrap_or(8));
     let addr = format!("{}:{}", host, port);
-    let connected = addr
+    let addrs: Vec<_> = addr
         .to_socket_addrs()
-        .ok()
-        .and_then(|mut iter| iter.next())
-        .map(|sa| TcpStream::connect_timeout(&sa, timeout).is_ok())
-        .unwrap_or(false);
+        .map(|iter| iter.take(TCP_MAX_ADDRS).collect())
+        .unwrap_or_default();
+    let connected = addrs
+        .into_iter()
+        .any(|sa| TcpStream::connect_timeout(&sa, timeout).is_ok());
     let t1 = now_ms();
     let ms = Some(t1.saturating_sub(t0));
     if connected {

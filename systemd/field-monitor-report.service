@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 Environment=HOME=%h
-ExecStart=/home/ni9aii/code/field-monitor/scripts/collect-and-report.sh
+ExecStart=%h/code/field-monitor/scripts/collect-and-report.sh
 StandardOutput=append:%h/.local/share/field-monitor/report.log
 StandardError=append:%h/.local/share/field-monitor/report.log
 

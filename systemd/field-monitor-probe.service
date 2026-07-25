@@ -6,6 +6,8 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 Environment=HOME=%h
+Environment=FIELD_MONITOR_CONFIG=%h/.config/field-monitor.toml
+Environment=FIELD_MONITOR_TARGETS=%h/.config/field-monitor-targets.toml
 ExecStart=%h/.local/bin/field-monitor probe
 StandardOutput=append:%h/.local/share/field-monitor/probe.log
 StandardError=append:%h/.local/share/field-monitor/probe.log
