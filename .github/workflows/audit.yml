@@ -1,0 +1,32 @@
+name: cargo audit (RUSTSEC)
+
+# Dependency vulnerability scan without any third-party service account.
+# Replaces the previous Snyk workflow, which required a Snyk org/token and
+# never opened PRs here. `rustsec/audit-check` runs the free `cargo audit`
+# CLI (no OAuth / no secrets) and fails the build on known RUSTSEC advisories.
+# GitHub's Dependabot security updates (already enabled on the repo) turn
+# those advisories into fix PRs automatically.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 4 * * *' # Daily 4AM UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write # audit-check may open an issue on failure (RUSTSEC finding)
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust (needed by cargo-audit)
+        uses: dtolnay/rust-toolchain@stable
+      - name: Run cargo audit (RUSTSEC advisories)
+        uses: rustsec/audit-check@v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}

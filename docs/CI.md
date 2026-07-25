@@ -13,6 +13,16 @@ Workflow: `.github/workflows/ci.yml`. Runs on every push and PR.
 | `test` | ubuntu + macos | `cargo test --release` |
 | `build` | ubuntu + macos | `cargo build --release` |
 | `native-aarch64` | ubuntu (QEMU) | native build **+ test** in `arm64v8/rust:1-bookworm` |
+| `audit` | ubuntu | `cargo audit` (RUSTSEC advisories) via `rustsec/audit-check` |
+
+### Dependency vulnerability scanning
+
+`.github/workflows/audit.yml` runs the free `cargo audit` CLI (RUSTSEC
+database) on every push, PR, and daily schedule. It needs **no third-party
+service account** — only the built-in `GITHUB_TOKEN`. Known advisories fail
+the job; GitHub's Dependabot security updates (enabled on the repo) turn
+those advisories into fix PRs automatically. This replaced the previous Snyk
+workflow, which required a Snyk org/token and never opened PRs in this repo.
 
 ### Why a native aarch64 container
 
@@ -25,9 +35,9 @@ SBC out of the box. The artifact `field-monitor-aarch64` is uploaded.
 ### Privacy-friendly
 
 CI has **no** access to `config.toml` / `targets.toml` / `.env` (all
-git-ignored) and uses no secrets. Tests use placeholder targets
-(`example.com`) and placeholder server IPs (`YOUR_SERVER_IP`) — no real
-infrastructure is ever referenced.
+git-ignored) and uses only the built-in `GITHUB_TOKEN` — no third-party
+secrets. Tests use placeholder targets (`example.com`) and placeholder server
+IPs (`YOUR_SERVER_IP`) — no real infrastructure is ever referenced.
 
 ### Covered by tests
 
