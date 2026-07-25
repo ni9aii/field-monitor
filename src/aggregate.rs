@@ -245,7 +245,11 @@ pub fn generate_markdown_report(s: &Summary, out_path: &Path) -> std::io::Result
                 // Status: distinguish a real success from "could not measure".
                 let status = if r.tcp == "closed" {
                     "BLOCKED"
-                } else if r.https_ms.map(|m| m > HTTPS_HIGH_LATENCY_MS).unwrap_or(false) {
+                } else if r
+                    .https_ms
+                    .map(|m| m > HTTPS_HIGH_LATENCY_MS)
+                    .unwrap_or(false)
+                {
                     "SLOW"
                 } else if r.https_code == Some(200) || r.tcp == "open" || r.icmp == "ok" {
                     "OK"
