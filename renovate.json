@@ -2,17 +2,12 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
   "schedule": ["before 6am"],
+  "labels": ["dependencies"],
   "packageRules": [
     {
       "matchUpdateTypes": ["patch", "minor", "major"],
       "automerge": false,
       "labels": ["dependencies"]
     }
-  ],
-  "labels": {
-    "dependencies": {
-      "additionalReviewers": [],
-      "automerge": false
-    }
-  }
+  ]
 }
