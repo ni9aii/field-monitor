@@ -1,0 +1,36 @@
+# gitleaks rules — field-monitor specific
+# Catches ONLY the concrete real-infra that was leaked historically.
+# Deliberately does NOT match anonymized placeholders (vp-*, KEY_A/KEY_B,
+# id_ed25519_* as variable names) so the hook does not block clean pushes.
+# Generic gitleaks rules also run by default.
+
+title = "field-monitor secret scan"
+
+[[rules]]
+description = "Real server IPv4 (not documentation ranges)"
+id = "fm-real-ip"
+regex = '\b(178\.72\.170\.27|194\.87\.210\.7|85\.208\.208\.113|45\.143\.138\.48|5\.182\.27\.43|46\.17\.248\.172|195\.133\.198\.80|193\.238\.134\.134|185\.184\.128\.1|62\.16\.40\.82|185\.173\.176\.89|2\.59\.41\.170|167\.233\.212\.101)\b'
+keywords = ["178.","194.","85.","45.","5.","46.","195.","193.","185.","62.","167."]
+
+[[rules]]
+description = "Real host labels (not anonymized vp-* names)"
+id = "fm-host-label"
+regex = '(?i)\b(VPN-DvaPuka-SPB2|PERM-home|MOW-vladimir|SPB2|SPB-ruvds|EKB-ruvds|KZN-ruvds|NSK-ruvds|VVO-ruvds|MOW-bm-server|bm-server-1779046186914|ruvds-x7yuy|ruvds-ow0uq|ruvds-klh99|ruvds-8vi23|ruvds-8drd7)\b'
+keywords = ["VPN-DvaPuka","PERM-home","MOW-vladimir","SPB2","ruvds-x7yuy"]
+
+[[rules]]
+description = "Hard-coded real local username path or deploy user"
+id = "fm-real-username"
+regex = '(/home/ni9aii/|ni9aii@)'
+keywords = ["/home/ni9aii/","ni9aii@"]
+
+[allowlist]
+description = "Files that legitimately contain anonymized placeholders only"
+paths = [
+  '''\.gitleaks\.toml''',
+  '''scripts/deploy-vantage\.sh''',
+  '''src/bin/gen-report\.rs''',
+  '''reporting/gen_report\.py''',
+  '''\.env\.example''',
+  '''systemd/.*''',
+]
