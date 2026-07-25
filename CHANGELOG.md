@@ -5,6 +5,40 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - 2026-07-25
+
+### Added
+
+- **Vantage-point deploy:** `scripts/deploy-vantage.sh` — idempotent
+  deploy of the agent + systemd units to the full vantage-point fleet,
+  reading the server inventory (IPs, SSH keys, users, ports) from a
+  private, git-ignored `vantage-points.env` so real infrastructure never
+  enters the repo. Relay-aware: servers whose direct 9922 is filtered
+  upstream are reached via a working peer.
+- **Local healthcheck:** `scripts/field-monitor-healthcheck.sh` plus
+  `field-monitor-healthcheck.{service,timer}` — verifies the agent is
+  actually producing fresh probe logs on each host (not just that the
+  unit is enabled), emitting a one-line OK/STALE per server.
+- **Rust report generator:** `src/bin/gen-report.rs` (and `tests/gen_report.rs`)
+  replaces the previous Python `gen_report.py` — native, dependency-free
+  markdown/timeline/geo report from aggregated `probe.log` data, with a
+  per-region topology table and an apple-scope report template
+  (`templates/apple-report-template.md`).
+- `vantage-points.example.env`, `targets.apple-example.toml` shipped as
+  templates (no real values).
+
+### Changed
+
+- `src/aggregate.rs` extended with a per-region/geo section, timeline
+  windowing, and the apple-only reporting scope.
+- `src/probe.rs`, `src/model.rs`, `src/main.rs`, `src/runner.rs`,
+  `src/ssh.rs`, `src/corroborate.rs`, `src/logfmt.rs`, `src/audit.rs`
+  refactored to support the new report fields and the vantage-point
+  deploy workflow.
+- `field-monitor-report.service` / `field-monitor-report.timer` added to
+  the orchestrator's per-server unit list; `field-monitor-probe.timer`
+  cadence adjusted.
+
 ## [0.4.1] - 2026-07-25
 
 ### Fixed
@@ -40,6 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - HTTPS `HIGH_LATENCY`/`SLOW` threshold lowered from 2000ms to 800ms
   (`HTTPS_HIGH_LATENCY_MS`); the DNS latency threshold (2000ms) is unchanged.
+
 
 ## [0.4.0] - 2026-07-22
 

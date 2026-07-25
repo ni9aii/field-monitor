@@ -1,0 +1,85 @@
+# field-monitor — allowlist (private, git-ignored)
+# Цели замера. Агент отказывается мерить вне этого списка.
+[[targets]]
+name = "github"
+host = "github.com"
+url = "https://github.com"
+ip = ""
+
+[[targets]]
+name = "github-api"
+host = "api.github.com"
+url = "https://api.github.com"
+ip = ""
+
+[[targets]]
+name = "apple"
+host = "www.apple.com"
+url = "https://www.apple.com"
+ip = ""
+
+[[targets]]
+name = "appleid"
+host = "appleid.apple.com"
+url = "https://appleid.apple.com"
+ip = ""
+
+[[targets]]
+name = "apps"
+host = "apps.apple.com"
+url = "https://apps.apple.com"
+ip = ""
+
+[[targets]]
+name = "music"
+host = "music.apple.com"
+url = "https://music.apple.com"
+ip = ""
+
+[[targets]]
+name = "mesu"
+host = "mesu.apple.com"
+url = "https://mesu.apple.com"
+ip = ""
+
+[[targets]]
+name = "support"
+host = "support.apple.com"
+url = "https://support.apple.com"
+ip = ""
+
+[[targets]]
+name = "developer"
+host = "developer.apple.com"
+url = "https://developer.apple.com"
+ip = ""
+
+[[targets]]
+name = "itunes"
+host = "itunes.apple.com"
+url = "https://itunes.apple.com"
+ip = ""
+
+[[targets]]
+name = "books"
+host = "books.apple.com"
+url = "https://books.apple.com"
+ip = ""
+
+[[targets]]
+name = "icloud"
+host = "www.icloud.com"
+url = "https://www.icloud.com"
+ip = ""
+
+[[targets]]
+name = "google"
+host = "www.google.com"
+url = "https://www.google.com"
+ip = ""
+
+[[targets]]
+name = "google-dns"
+host = ""
+url = ""
+ip = "8.8.8.8"
