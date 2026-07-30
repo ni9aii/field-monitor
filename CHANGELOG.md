@@ -5,6 +5,18 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] - 2026-07-30
+
+### Changed
+
+- **Bundled `is_safe()` allowlist sanitizer fixes** (subdomain hosts like
+  subdomain hosts are now correctly accepted; older on-disk binaries built
+  before 2026-07-19 rejected any host containing a dot-delimited subdomain
+  beyond the registrable domain). Re-deploy to the fleet after upgrading.
+- **Targets allowlist refresh:** added two additional messenger
+  allowlist groups and their host/subdomain sets, and reduced the Apple
+  scope to the core three (`apple`, `appleid`, `icloud`).
+
 ## [0.4.2] - 2026-07-25
 
 ### Added
