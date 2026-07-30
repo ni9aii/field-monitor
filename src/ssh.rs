@@ -44,11 +44,13 @@ pub fn run_remote(
 ) -> std::io::Result<String> {
     let remote = format!("{}@{}", server.user, server.ip);
     let dest = format!("{}:/tmp/field-monitor", remote);
-    let ssh_opts = [
+    // NOTE: scp uses `-P` (capital) for the port, while ssh uses `-p`
+    // (lowercase). They must not share one option array or non-22 ports
+    // silently fail (ssh ignores `-P` and hangs on the default 22).
+    let port = server.port.to_string();
+    let common_opts = [
         "-i",
         &server.key,
-        "-P",
-        &server.port.to_string(),
         "-o",
         "StrictHostKeyChecking=accept-new",
         "-o",
@@ -58,10 +60,13 @@ pub fn run_remote(
         "-o",
         "ServerAliveCountMax=3",
     ];
+    let scp_opts = ["-P", &port];
+    let ssh_opts = ["-p", &port];
     // 1) scp the binary (only when requested — orchestrator uploads once).
     if upload {
         let scp = Command::new("scp")
-            .args(ssh_opts)
+            .args(common_opts)
+            .args(scp_opts)
             .args([bin_local, &dest])
             .output()?;
         if !scp.status.success() {
@@ -90,6 +95,7 @@ pub fn run_remote(
         cleanup = cleanup_cmd,
     );
     let out = Command::new("ssh")
+        .args(common_opts)
         .args(ssh_opts)
         .arg(&remote)
         .arg(&remote_cmd)
